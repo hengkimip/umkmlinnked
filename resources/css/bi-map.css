@@ -1,0 +1,803 @@
+/* ==================== RESET & BASE ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f5f5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+select,
+textarea,
+button {
+    font-family: inherit;
+}
+
+/* ==================== MAP ==================== */
+#map {
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f7 100%) !important;
+    position: relative;
+    z-index: 1;
+}
+
+.leaflet-container {
+    font-family: inherit;
+    background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f7 100%) !important;
+}
+
+/* ===== MAP TILES ===== */
+.leaflet-tile {
+    filter: brightness(1.05) contrast(1.1);
+}
+
+.leaflet-tile-pane {
+    opacity: 0.95;
+}
+
+/* ==================== LEAFLET PANE SETUP ==================== */
+/* Leaflet default pane z-index order (dari terdalam ke terdepan):
+   - shadowPane: z-index 2
+   - overlayPane: z-index 4
+   - markerPane: z-index 6
+   - tooltipPane: z-index 650
+   - popupPane: z-index 700
+*/
+
+.leaflet-pane {
+    z-index: 1 !important;
+}
+
+.leaflet-shadow-pane {
+    z-index: 2 !important;
+}
+
+.leaflet-overlay-pane {
+    z-index: 4 !important;
+}
+
+.leaflet-marker-pane {
+    z-index: 6 !important;
+}
+
+.leaflet-popup-pane {
+    z-index: 700 !important;
+}
+
+/* ==================== CONNECTOR LINE STYLING ==================== */
+/* Garis connector harus di belakang label */
+.connector-line-custom {
+    stroke: #003066 !important;
+    stroke-width: 3 !important;
+    stroke-dasharray: 8, 6 !important;
+    opacity: 0.65 !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+/* Alternatif: Target semua polylines di overlay pane */
+.leaflet-overlay-pane path {
+    stroke: #003066 !important;
+    stroke-width: 3 !important;
+    stroke-dasharray: 8, 6 !important;
+    opacity: 0.65 !important;
+    pointer-events: none !important;
+}
+
+/* ==================== CIRCLE MARKER STYLING ==================== */
+.city-marker-custom {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    z-index: 600 !important;
+}
+
+.city-marker-custom:hover {
+    filter: brightness(1.3) drop-shadow(0 4px 8px rgba(0, 48, 102, 0.3));
+}
+
+/* ==================== LABEL STYLING (PALING DEPAN) ==================== */
+.custom-label-icon {
+    background: none !important;
+    border: none !important;
+    z-index: 700 !important;
+}
+
+.city-label {
+    background: white;
+    border: 2.5px solid #003066;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: 700;
+    font-size: 11px;
+    color: #003066;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    z-index: 700 !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    background-image: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.95),
+        rgba(255, 255, 255, 1)
+    );
+}
+
+/* Pointer arrow di atas label */
+.city-label::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid #003066;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 700 !important;
+}
+
+.city-label:hover {
+    transform: scale(1.1) translateY(-4px);
+    background: #003066;
+    color: white;
+    box-shadow: 0 8px 20px rgba(0, 48, 102, 0.4);
+    border-color: #003066;
+}
+
+.city-label:hover::before {
+    opacity: 1;
+}
+
+.city-label:active {
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 48, 102, 0.2);
+}
+
+.city-label__name {
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: -0.3px;
+    z-index: 700 !important;
+}
+
+.city-label__count {
+    font-size: 9px;
+    font-weight: 800;
+    color: #16a34a;
+    line-height: 1;
+    z-index: 700 !important;
+}
+
+.city-label:hover .city-label__name {
+    color: white;
+}
+
+.city-label:hover .city-label__count {
+    color: #bbf7d0;
+}
+
+/* ==================== ENSURE PROPER LAYERING ==================== */
+/* Pastikan label tidak tertutup oleh elemen lain */
+.leaflet-marker-icon {
+    z-index: 700 !important;
+}
+
+.leaflet-popup {
+    z-index: 700 !important;
+}
+
+.leaflet-tooltip {
+    z-index: 750 !important;
+}
+
+/* ==================== DISABLE POINTER EVENTS ON CONNECTOR =====*/
+.leaflet-overlay-pane path {
+    pointer-events: none !important;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1024px) {
+    .city-label {
+        font-size: 10px;
+        padding: 4px 10px;
+    }
+
+    .city-label__name {
+        font-size: 10px;
+    }
+
+    .city-label__count {
+        font-size: 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    .city-label {
+        font-size: 9px;
+        padding: 3px 8px;
+    }
+
+    .city-label__name {
+        font-size: 9px;
+    }
+
+    .city-label__count {
+        font-size: 7px;
+    }
+}
+
+/* ==================== SCROLLBAR ==================== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f1f1;
+}
+
+/* ==================== SIDEBAR STYLING ==================== */
+/* ===== SIDEBAR COLLAPSE ANIMATION ===== */
+aside {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 320px;
+}
+
+aside.collapsed {
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+main {
+    transition: flex 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+main.expanded {
+    flex: 1;
+}
+
+.toggle-sidebar-btn {
+    transition: all 0.3s ease;
+    position: fixed;
+    left: 320px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 999;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    width: 32px;
+    height: 48px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+    color: #003066;
+    font-weight: bold;
+}
+
+.toggle-sidebar-btn:hover {
+    background-color: #f8f9fa;
+    box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-sidebar-btn:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.toggle-sidebar-btn svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease;
+}
+
+aside.collapsed ~ .toggle-sidebar-btn {
+    left: 0;
+    border-radius: 0 8px 8px 0;
+}
+
+aside.collapsed ~ .toggle-sidebar-btn svg {
+    transform: rotate(180deg);
+}
+
+aside h2 {
+    letter-spacing: -0.02em;
+    text-transform: none;
+}
+
+/* Tab styling */
+aside button {
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Content area */
+aside > div:nth-child(2) {
+    background: white;
+}
+
+/* ==================== UTILITY ==================== */
+[x-cloak] {
+    display: none !important;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.no-select {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.smooth-transition {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ==================== PRINT ==================== */
+@media print {
+    #map {
+        display: none;
+    }
+
+    .no-print {
+        display: none;
+    }
+}
+
+/* ==================== ANIMATIONS ==================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-slideInLeft {
+    animation: slideInLeft 0.3s ease;
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ==================== DARK MODE SUPPORT ==================== */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: #1a1a1a;
+    }
+
+    #map {
+        background: linear-gradient(
+            135deg,
+            #2c3e50 0%,
+            #34495e 100%
+        ) !important;
+    }
+
+    .leaflet-container {
+        background: linear-gradient(
+            135deg,
+            #2c3e50 0%,
+            #34495e 100%
+        ) !important;
+    }
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+    .city-label {
+        border-width: 3px;
+        box-shadow: 0 0 0 3px rgba(0, 48, 102, 0.2);
+    }
+
+    .leaflet-control-zoom a {
+        border-width: 2px;
+    }
+}
+
+/* ==================== FOOTER ==================== */
+footer {
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+    z-index: 100;
+}
+
+footer a {
+    color: #666;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+footer a:hover {
+    color: #003066;
+}
+
+footer button {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+footer button:hover {
+    background: #1f2937 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ==================== HEADER ==================== */
+header {
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    z-index: 1000;
+}
+
+header input {
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+header input:focus {
+    border-color: #003066;
+    box-shadow: 0 0 0 3px rgba(0, 48, 102, 0.1);
+}
+
+header select {
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+header select:focus {
+    border-color: #003066;
+    box-shadow: 0 0 0 3px rgba(0, 48, 102, 0.1);
+}
+
+header button {
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+header button:hover {
+    background-color: #f3f4f6;
+    color: #003066;
+}
+
+header button:active {
+    transform: scale(0.98);
+}
+
+/* ==================== LEGEND ==================== */
+.legend {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e0e0e0;
+}
+
+.legend-title {
+    font-size: 10px;
+    font-weight: 900;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.legend-item:last-child {
+    margin-bottom: 0;
+}
+
+.legend-item-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ==================== STATISTICS CARDS ==================== */
+.stat-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    border-color: #003066;
+    box-shadow: 0 4px 12px rgba(0, 48, 102, 0.1);
+    transform: translateY(-2px);
+}
+
+.stat-card-label {
+    font-size: 10px;
+    font-weight: 900;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.stat-card-value {
+    font-size: 24px;
+    font-weight: 900;
+    color: #003066;
+    line-height: 1;
+}
+
+/* ==================== LOADING ==================== */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e0e0e0;
+    border-top-color: #003066;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ==================== CUSTOM ==================== */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ==================== END ==================== */
+/* ==================== RADIAL EXPANSION ==================== */
+
+.radial-svg-overlay {
+    pointer-events: none !important;
+    z-index: 400;
+}
+
+.radial-branch {
+    stroke: #003066 !important;
+    stroke-width: 2 !important;
+    stroke-dasharray: 5, 5 !important;
+    opacity: 0.6 !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.radial-label {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    fill: #003066 !important;
+    text-anchor: middle !important;
+    dominant-baseline: middle !important;
+    pointer-events: none !important;
+    text-shadow:
+        0 0 3px white,
+        0 0 3px white;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* ==================== ANIMATIONS ==================== */
+
+@keyframes strokeAnimation {
+    from {
+        stroke-dashoffset: var(--length);
+        opacity: 0;
+    }
+    to {
+        stroke-dashoffset: 0;
+        opacity: 0.6;
+    }
+}
+
+@keyframes fadeInLabel {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ==================== CITY LABEL ACTIVE STATE ==================== */
+
+.city-label.active {
+    background: #003066;
+    color: white;
+    box-shadow: 0 8px 20px rgba(0, 48, 102, 0.4);
+    border-color: #003066;
+}
+
+.city-label.active .city-label__count {
+    color: #bbf7d0;
+}
+
+/* ==================== CLOSE BUTTON UNTUK RADIAL ==================== */
+
+.radial-close-btn {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 600;
+    padding: 8px 16px;
+    background: white;
+    border: 2px solid #003066;
+    color: #003066;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 48, 102, 0.2);
+    transition: all 0.2s ease;
+    display: none;
+}
+
+.radial-close-btn.show {
+    display: block;
+    animation: slideIn 0.3s ease;
+}
+
+.radial-close-btn:hover {
+    background: #003066;
+    color: white;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

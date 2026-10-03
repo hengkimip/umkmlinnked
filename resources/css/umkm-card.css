@@ -1,0 +1,130 @@
+/* ============================================
+   UMKM CARD COMPONENT
+   ============================================ */
+.umkm-card {
+    display: block;
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    text-decoration: none;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transition:
+        box-shadow 0.2s,
+        border-color 0.2s;
+}
+
+.umkm-card:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.umkm-card__photo-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* rasio 1:1 */
+    overflow: hidden;
+    background: #f0fdfa;
+}
+
+.umkm-card__photo {
+    position: absolute;
+    inset: 0;
+}
+
+.umkm-card__photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.umkm-card__placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 52px;
+    background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+}
+
+.umkm-card__badges {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    max-width: calc(100% - 46px);
+    z-index: 5;
+}
+
+.umkm-badge {
+    color: white;
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.umkm-card__klasifikasi {
+    position: absolute;
+    bottom: 42px;
+    left: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    z-index: 5;
+}
+
+.umkm-card__klasifikasi--unggulan {
+    background: #facc15;
+    color: #713f12;
+}
+
+.umkm-card__klasifikasi--berkembang {
+    background: #60a5fa;
+    color: #1e3a5f;
+}
+
+.umkm-card__whatsapp {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    z-index: 5;
+}
+
+.umkm-card__info {
+    padding: 12px 14px;
+}
+
+.umkm-card__nama {
+    font-weight: 700;
+    font-size: 14px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.umkm-card__info--digital .umkm-card__nama {
+    color: #0d9488;
+}
+.umkm-card__info--global .umkm-card__nama {
+    color: #1d4ed8;
+}
+
+.umkm-card__sektor {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 4px 0 0;
+}
