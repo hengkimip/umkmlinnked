@@ -16,7 +16,8 @@ function initSlider() {
 function slideTrack(direction) {
     const track = document.getElementById("trending-track");
     if (!track || !track.children.length) return;
-    const cardWidth = track.children[0].offsetWidth + 16;
+    const gap = parseFloat(getComputedStyle(track).columnGap) || 16;
+    const cardWidth = track.children[0].offsetWidth + gap;
     const visible =
         Math.floor(track.parentElement.offsetWidth / cardWidth) || 1;
     const max = Math.max(0, (track.children.length - visible) * cardWidth);
@@ -78,7 +79,11 @@ function initWhatsappButtons() {
         btn.addEventListener("click", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            window.open(this.dataset.waLink, "_blank");
+            // Hanya izinkan tautan wa.me; noopener agar tab baru tak bisa mengakses window.opener
+            const link = this.dataset.waLink || "";
+            if (/^https:\/\/wa\.me\/\d{8,15}$/.test(link)) {
+                window.open(link, "_blank", "noopener,noreferrer");
+            }
         });
     });
 }
@@ -96,11 +101,8 @@ function initMobileFilterToggle() {
     const panel = document.getElementById("sidebar-panel");
     if (!toggle || !panel) return;
     toggle.addEventListener("click", () => {
-        panel.classList.toggle("is-open");
-        const isOpen = panel.classList.contains("is-open");
-        toggle.querySelector("[data-toggle-icon]").textContent = isOpen
-            ? "▲"
-            : "▼";
+        const isOpen = panel.classList.toggle("is-open");
+        toggle.setAttribute("aria-expanded", String(isOpen));
     });
 }
 
@@ -108,12 +110,84 @@ function initMobileNav() {
     const burger = document.getElementById("nav-burger");
     const menu = document.getElementById("nav-menu");
     if (!burger || !menu) return;
-    burger.addEventListener("click", () => {
-        menu.classList.toggle("is-open");
+    const setOpen = (open) => {
+        menu.classList.toggle("is-open", open);
+        burger.setAttribute("aria-expanded", String(open));
+        burger.setAttribute("aria-label", open ? "Tutup menu" : "Buka menu");
+    };
+    burger.addEventListener("click", () =>
+        setOpen(!menu.classList.contains("is-open")),
+    );
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setOpen(false);
+    });
+}
+
+// URL gambar aman untuk dipasang ke src & CSS url() (sama dengan aturan di server)
+const SAFE_IMG = /^(https?:\/\/|\/)[^\s'"()<>\\]+$/;
+
+function initGallery() {
+    const gallery = document.querySelector("[data-gallery]");
+    if (!gallery) return;
+    const stage = gallery.querySelector("[data-gallery-stage]");
+    const img = gallery.querySelector("[data-gallery-img]");
+    const name = gallery.querySelector("[data-gallery-name]");
+    const price = gallery.querySelector("[data-gallery-price]");
+    const wa = gallery.querySelector("[data-gallery-wa]");
+    const thumbs = gallery.querySelectorAll("[data-thumb-src]");
+
+    thumbs.forEach((thumb) => {
+        thumb.addEventListener("click", () => {
+            const src = thumb.dataset.thumbSrc;
+            if (!img || !SAFE_IMG.test(src)) return;
+            img.src = src;
+            img.alt = thumb.dataset.thumbName || "";
+            stage.style.setProperty("--img", `url('${src}')`);
+            if (name) name.textContent = thumb.dataset.thumbName || "";
+            if (price) {
+                price.textContent = "";
+                if (thumb.dataset.thumbPrice) {
+                    const strong = document.createElement("strong");
+                    strong.textContent = thumb.dataset.thumbPrice;
+                    price.appendChild(strong);
+                } else {
+                    price.textContent = "Harga dapat ditanyakan langsung ke penjual";
+                }
+            }
+            if (wa && /^https:\/\/wa\.me\/\d{8,15}\?text=/.test(thumb.dataset.thumbWa || "")) {
+                wa.href = thumb.dataset.thumbWa;
+            }
+            thumbs.forEach((t) => t.setAttribute("aria-pressed", String(t === thumb)));
+        });
+    });
+}
+
+function initShare() {
+    document.querySelectorAll("[data-share]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const url = btn.dataset.shareUrl || window.location.href;
+            const title = btn.dataset.shareTitle || document.title;
+            const label = btn.querySelector("[data-share-label]");
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title, url });
+                    return;
+                }
+                await navigator.clipboard.writeText(url);
+                if (label) {
+                    label.textContent = "Tautan disalin";
+                    setTimeout(() => (label.textContent = "Bagikan"), 2000);
+                }
+            } catch (e) {
+                /* dibatalkan pengguna */
+            }
+        });
     });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    initGallery();
+    initShare();
     initSlider();
     initFilterCheckboxes();
     initHargaFilter();

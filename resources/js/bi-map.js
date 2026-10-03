@@ -495,7 +495,7 @@ window.umkmApp = () => {
             this.selectedCity = null;
             this.selectedKabupaten = "";
             this.selectedTier = "";
-            this.activeTab = "database";
+            this.activeTab = "dashboard";
             this.currentStats = { dasar: 0, berkembang: 0, unggulan: 0 };
             this.searchQuery = "";
 
@@ -503,7 +503,7 @@ window.umkmApp = () => {
                 this.map.flyTo([0, 110], 8, { duration: 0.5 });
             }
 
-            console.log("✅ Map reset - Showing all 143 UMKM");
+            console.log(`✅ Map reset - Showing all ${this.databaseUMKM.length} UMKM`);
         },
 
         focusKalbar() {

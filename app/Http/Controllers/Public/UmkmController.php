@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Umkm;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class UmkmController extends Controller
 {
@@ -14,7 +13,7 @@ class UmkmController extends Controller
             ->aktif();
 
         if ($request->filled('q')) {
-            $q = $request->q;
+            $q = mb_substr(trim((string) $request->q), 0, 100);
             $query->where(function ($sub) use ($q) {
                 $sub->where('nama_usaha', 'like', "%{$q}%")
                     ->orWhere('sektor', 'like', "%{$q}%")
@@ -68,45 +67,29 @@ class UmkmController extends Controller
             ->filter()
             ->values();
 
-        $sektorList = Umkm::aktif()
-            ->distinct()
-            ->orderBy('sektor')
-            ->pluck('sektor')
-            ->filter()
-            ->values();
+        // Kategori sidebar: hanya sektor yang benar-benar ada datanya
+        $sektorList = Umkm::sektorTersedia();
 
-        // Kategori sidebar
-        $kategoriGoDigital = [
-            'kuliner'    => 'Makanan Berat dan Bumbu',
-            'minuman'    => 'Minuman dan Madu',
-            'camilan'    => 'Camilan dan Kue',
-            'fashion'    => 'Pakaian',
-            'aksesoris'  => 'Aksesoris',
-            'kerajinan'  => 'Kerajinan',
+        // Statistik dalam satu query agregat
+        $kosong = Umkm::KABUPATEN_KOSONG;
+        $agg = Umkm::aktif()->toBase()->selectRaw("
+            count(*) as total,
+            sum(case when klasifikasi = 'unggulan' then 1 else 0 end) as unggulan,
+            sum(case when klasifikasi = 'berkembang' then 1 else 0 end) as berkembang,
+            sum(case when instagram is not null then 1 else 0 end) as digital,
+            count(distinct case when kabupaten <> ? then kabupaten end) as kabupaten
+        ", [$kosong])->first();
+
+        $stats = [
+            ['value' => (int) $agg->total,      'label' => 'Total UMKM', 'highlight' => true],
+            ['value' => (int) $agg->unggulan,   'label' => 'Unggulan'],
+            ['value' => (int) $agg->berkembang, 'label' => 'Berkembang'],
+            ['value' => (int) $agg->digital,    'label' => 'Go Digital'],
+            ['value' => (int) $agg->kabupaten,  'label' => 'Kabupaten/Kota'],
         ];
-
-        $kategoriGoGlobal = [
-            'pangan'     => 'Pangan Olahan dalam Kemasan',
-            'furnitur'   => 'Kerajinan dan Furnitur',
-            'fesyen'     => 'Fesyen dan Aksesoris',
-            'komoditas'  => 'Komoditas dan Agro',
-            'kecantikan' => 'Kecantikan dan Perawatan Tubuh',
-        ];
-
-        // Program list dari sektor aktual di database
-        $programList = DB::table('umkm')
-            ->whereNotNull('sektor')
-            ->where('status', 'aktif')
-            ->whereNull('deleted_at')
-            ->distinct()
-            ->orderBy('sektor')
-            ->pluck('sektor')
-            ->filter()
-            ->values();
 
         return view('public.direktori', compact(
-            'umkm', 'trending', 'kabupatenList', 'sektorList',
-            'kategoriGoDigital', 'kategoriGoGlobal', 'programList'
+            'umkm', 'trending', 'kabupatenList', 'sektorList', 'stats'
         ));
     }
 
@@ -114,15 +97,18 @@ class UmkmController extends Controller
     {
         abort_if($umkm->status !== 'aktif', 404);
 
+        // Hanya relasi yang ditampilkan publik. Pemilik, keuangan, dan
+        // pembiayaan sengaja tidak dimuat (NFR-02, minimisasi data).
         $umkm->load([
-            'pemilik', 'opd', 'produk', 'pemasaran',
-            'legalitas', 'keuanganTerakhir', 'pembiayaan'
+            'produk' => fn ($q) => $q->where('is_active', true)->orderByDesc('is_unggulan')->orderBy('urutan'),
+            'pemasaran', 'legalitas',
         ]);
 
-        $related = Umkm::with('produkUnggulan')
+        $related = Umkm::with(['produkUnggulan', 'produk'])
             ->aktif()
             ->where('sektor', $umkm->sektor)
             ->where('id', '!=', $umkm->id)
+            ->orderByDesc('skor_total')
             ->limit(4)
             ->get();
 

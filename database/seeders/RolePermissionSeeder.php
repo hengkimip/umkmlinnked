@@ -2,35 +2,37 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        // Clear cache
-        app()['cache']->forget('spatie.permission.cache');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // Create roles
-        Role::firstOrCreate(['name' => 'superadmin', 'guard_name' => 'web']);
-        Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        // Peran sesuai PRD v1.1 (FR-01)
+        $superAdmin = Role::firstOrCreate(['name' => User::ROLE_SUPER_ADMIN, 'guard_name' => 'web']);
+        $adminOpd   = Role::firstOrCreate(['name' => User::ROLE_ADMIN_OPD, 'guard_name' => 'web']);
 
-        // Create permissions
-        Permission::firstOrCreate(['name' => 'view-dashboard', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'view-peta', 'guard_name' => 'web']);
-        Permission::firstOrCreate(['name' => 'import-data', 'guard_name' => 'web']);
+        $permissions = [
+            'view-dashboard',
+            'view-peta-interaktif',
+            'import-data',
+            'manage-umkm',
+            'manage-users',
+        ];
 
-        // Assign to SuperAdmin
-        $superadmin = Role::findByName('superadmin');
-        $superadmin->syncPermissions(['view-dashboard', 'view-peta', 'import-data']);
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
 
-        // Assign to Admin
-        $admin = Role::findByName('admin');
-        $admin->syncPermissions(['view-dashboard', 'import-data']);
+        $superAdmin->syncPermissions($permissions);
+        $adminOpd->syncPermissions(['view-dashboard', 'import-data', 'manage-umkm']);
 
-        echo "✅ Roles and permissions seeded!\n";
+        $this->command?->info('Roles dan permissions selesai: super-admin, admin-opd.');
     }
 }

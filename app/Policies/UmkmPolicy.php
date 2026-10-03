@@ -9,35 +9,42 @@ class UmkmPolicy
 {
     public function before(User $user): ?bool
     {
-        if ($user->hasRole('super-admin')) return true;
+        if ($user->isSuperAdmin()) return true;
         return null;
     }
 
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['admin-opd', 'super-admin']);
+        return $user->isAdminAny();
     }
 
     public function view(User $user, Umkm $umkm): bool
     {
-        return $user->hasRole('super-admin')
-            || $umkm->opd_id === $user->opd_id;
+        return $this->dalamWilayah($user, $umkm);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin-opd', 'super-admin']);
+        return $user->isAdminAny();
     }
 
     public function update(User $user, Umkm $umkm): bool
     {
-        return $user->hasRole('super-admin')
-            || $umkm->opd_id === $user->opd_id;
+        return $this->dalamWilayah($user, $umkm);
     }
 
     public function delete(User $user, Umkm $umkm): bool
     {
-        return $user->hasRole('super-admin')
-            || $umkm->opd_id === $user->opd_id;
+        return $this->dalamWilayah($user, $umkm);
+    }
+
+    /**
+     * Admin OPD hanya boleh mengelola UMKM binaan OPD-nya (FR-02).
+     */
+    private function dalamWilayah(User $user, Umkm $umkm): bool
+    {
+        return $user->isAdmin()
+            && $user->opd_id !== null
+            && (int) $umkm->opd_id === (int) $user->opd_id;
     }
 }

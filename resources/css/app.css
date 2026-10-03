@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Motif & siluet Kalimantan Barat untuk panel biru (login, dll.)
+   — aset sama dengan halaman publik, < 3 KB */
+.kalbar-motif {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: url("../images/kalbar-pattern.svg") repeat;
+    background-size: 96px;
+    opacity: 0.12;
+    -webkit-mask-image: linear-gradient(160deg, #000 0%, rgba(0, 0, 0, 0.35) 70%);
+    mask-image: linear-gradient(160deg, #000 0%, rgba(0, 0, 0, 0.35) 70%);
+}
+.kalbar-skyline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 34%;
+    max-height: 260px;
+    pointer-events: none;
+    background: url("../images/kalbar-skyline.svg") no-repeat center bottom / cover;
+    opacity: 0.16;
+}

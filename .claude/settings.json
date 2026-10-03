@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\Users\\\\Acer\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--laragon-www-umkmlinked12\\\\c3837bea-4b23-49c6-b8c9-e83cd4313619\\\\scratchpad\\\\shots.ps1\")",
+      "PowerShell(foreach \\($s in '/storage/produk/foto/kopi-6.jpg','/storage/produk/foto/sirup-lemon-dan-coffee-shop-43.jpg','/storage/produk/foto/kosmetik-14.jpg'\\) { try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000$s\" -UseBasicParsing -TimeoutSec 15; \"$\\($r.StatusCode\\) $\\($r.RawContentLength\\) B $\\($r.Headers['Content-Type']\\) $s\" } catch { \"ERR $s $\\($_.Exception.Message\\)\" } }; Get-ChildItem public/storage/produk/foto -ErrorAction SilentlyContinue | Measure-Object Length -Sum -Average | Select-Object Count, @{n='TotalMB';e={[math]::Round\\($_.Sum/1MB,1\\)}}, @{n='RataKB';e={[math]::Round\\($_.Average/1KB\\)}})",
+      "Bash(grep -o '\"test\":\"[^\"]*\"\\\\|\"message\":\"[^\"]\\\\{0,300\\\\}')",
+      "Bash(php -r 'foreach \\(array_slice\\(glob\\(\"public/storage/produk/foto/*\"\\),0,5\\) as $f\\) { [$w,$h]=getimagesize\\($f\\); echo basename\\($f\\).\" {$w}x{$h}\\\\n\"; }')",
+      "Bash(grep -n \"^/\\\\* ====\\\\|RESPONSIF\" resources/css/direktori-layout.css)",
+      "Bash(cat \"/c/Users/Acer/AppData/Local/Temp/claude/c--laragon-www-umkmlinked12/c3837bea-4b23-49c6-b8c9-e83cd4313619/scratchpad/detail-tentang.css\" >> resources/css/direktori-layout.css && wc -l resources/css/direktori-layout.css && file -b resources/css/direktori-layout.css)",
+      "Read(//c/Users/Acer/AppData/Local/Temp/claude/c--laragon-www-umkmlinked12/c3837bea-4b23-49c6-b8c9-e83cd4313619/scratchpad/**)",
+      "Bash(grep -o '\"test\":\"[^\"]*\"\\\\|\"message\":\"[^\"]\\\\{0,400\\\\}')",
+      "PowerShell(npm run build 2>&1 | Select-String -Pattern 'built in|error'; php artisan view:clear | Out-Null; php \"C:\\\\Users\\\\Acer\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--laragon-www-umkmlinked12\\\\c3837bea-4b23-49c6-b8c9-e83cd4313619\\\\scratchpad\\\\smoke-detail.php\"; foreach \\($p in '/tentang-kami','/login','/direktori'\\) { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8000$p\" -UseBasicParsing; \"$p $\\($r.StatusCode\\) $\\([math]::Round\\($r.RawContentLength/1KB,1\\)\\) KB\" })"
+    ]
+  }
+}

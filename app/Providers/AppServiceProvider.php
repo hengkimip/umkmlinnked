@@ -7,6 +7,8 @@ use App\Models\Umkm;
 use App\Models\User;
 use App\Policies\UmkmPolicy;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // NFR-01: semua URL memakai HTTPS di produksi
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
+        // NFR-01: kebijakan kata sandi; lebih ketat di produksi
+        Password::defaults(fn () => $this->app->environment('production')
+            ? Password::min(10)->letters()->mixedCase()->numbers()
+            : Password::min(8));
+
         // ==================== POLICIES ====================
         Gate::policy(Umkm::class, UmkmPolicy::class);
 

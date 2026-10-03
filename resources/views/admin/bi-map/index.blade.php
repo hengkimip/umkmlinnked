@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="bi-data-url" content="{{ route('admin.peta-interaktif.data') }}">
     <title>Peta Interaktif UMKM - KPw BI Kalimantan Barat</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+    <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
+    <style>body { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; }</style>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -22,7 +26,12 @@
             
             {{-- LEFT: LOGO --}}
             <div class="flex items-center gap-3 min-w-max">
-                <img src="{{ asset('logo_umkm_linked.png') }}" alt="UMKMLinked" class="h-10">
+                <a href="{{ route('admin.dashboard') }}" title="Ke dashboard admin">
+                    <picture>
+                        <source srcset="{{ asset('logo-umkmlinked.webp') }}" type="image/webp">
+                        <img src="{{ asset('logo-umkmlinked.png') }}" alt="UMKMLinked" width="480" height="147" class="h-10 w-auto">
+                    </picture>
+                </a>
             </div>
 
             {{-- CENTER: SEARCH & FILTERS --}}
@@ -58,16 +67,24 @@
             </div>
 
             {{-- RIGHT: USER INFO --}}
-            <div class="flex items-center gap-3 hidden sm:flex min-w-max">
+            <div class="hidden sm:flex items-center gap-3 min-w-max">
+                <a href="{{ route('admin.dashboard') }}"
+                   class="px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-all whitespace-nowrap">
+                    Panel Admin
+                </a>
                 <div class="flex flex-col items-end">
-                    <span class="text-xs font-bold text-slate-800">Super Admin</span>
-                    <span class="text-[9px] text-green-500 font-black uppercase">Sistem Online</span>
+                    <span class="text-xs font-bold text-slate-800">{{ auth()->user()->name }}</span>
+                    <span class="text-[9px] text-green-600 font-black uppercase">{{ auth()->user()->roleLabel() }}</span>
                 </div>
-                <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                </div>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" title="Keluar" aria-label="Keluar"
+                        class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
+                        </svg>
+                    </button>
+                </form>
             </div>
         </div>
     </header>
@@ -375,8 +392,7 @@
         </div>
     </footer>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    {{-- Leaflet sudah dimuat di <head>; Alpine dijalankan oleh resources/js/bi-map.js --}}
 
 </body>
 </html>

@@ -17,9 +17,6 @@ use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 
-/**
- * @method \Illuminate\Support\Collection failures()
- */
 class UmkmImport implements
     ToCollection,
     WithHeadingRow,
@@ -28,12 +25,13 @@ class UmkmImport implements
 {
     use SkipsErrors;
 
-    // ... sisa kode tidak berubah
-
     private int $opdId;
     private UmkmScoringService $scoring;
 
     public int $imported = 0;
+
+    // Nomor baris di file (baris 1 = header), berlanjut antar-chunk
+    private int $rowNumber = 1;
 
     public function __construct(int $opdId)
     {
@@ -45,13 +43,14 @@ class UmkmImport implements
 
     public function collection(Collection $rows)
     {
-        // DEBUG: cek kolom yang terbaca dari CSV
-    if ($rows->first()) {
-        $kolomCSV = array_keys($rows->first()->toArray());
-         \Illuminate\Support\Facades\Log::info('Kolom CSV yang terbaca: ' . implode(', ', $kolomCSV));
-        echo "Kolom CSV: " . implode(', ', $kolomCSV) . "\n";
-    }
-        foreach ($rows as $index => $row) {
+        if ($rows->first()) {
+            $kolomCSV = array_keys($rows->first()->toArray());
+            \Illuminate\Support\Facades\Log::info('Kolom CSV yang terbaca: ' . implode(', ', $kolomCSV));
+        }
+
+        foreach ($rows as $row) {
+            $this->rowNumber++;
+
             try {
                 DB::transaction(function () use ($row) {
                     // 1. Simpan atau update Pemilik Usaha
@@ -160,7 +159,11 @@ class UmkmImport implements
                 $this->imported++;
 
             } catch (\Throwable $e) {
-                $this->errors[] = "Baris " . ($index + 2) . ": " . $e->getMessage();
+                // Detail teknis hanya ke log; pengguna menerima pesan ringkas
+                \Illuminate\Support\Facades\Log::warning("Import UMKM baris {$this->rowNumber} gagal: " . $e->getMessage());
+                $nama = trim((string) ($row['nama_umkmusaha'] ?? ''));
+                $this->errors[] = "Baris {$this->rowNumber}" . ($nama !== '' ? " ({$nama})" : '')
+                    . ': data tidak valid atau kolom wajib kosong.';
             }
         }
     }

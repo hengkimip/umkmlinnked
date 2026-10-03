@@ -1,247 +1,212 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Foto Produk — Admin</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="bg-gray-100 font-sans">
-<div class="flex min-h-screen">
+@extends('layouts.admin')
 
-    {{-- Sidebar --}}
-    <aside style="width:224px; background:#166534; color:white; flex-shrink:0; position:relative">
-        <div style="padding:20px; border-bottom:1px solid rgba(255,255,255,0.2)">
-            <span style="font-weight:700; font-size:18px">UMKMLinked.ID</span>
-            <p style="font-size:12px; color:rgba(255,255,255,0.6); margin:4px 0 0">Panel Admin</p>
-        </div>
-        <nav style="padding:16px; font-size:14px">
-            <a href="/admin/dashboard" style="display:block; padding:8px 12px; border-radius:8px; color:white; text-decoration:none; margin-bottom:4px; opacity:0.8">Dashboard</a>
-            <a href="/admin/import" style="display:block; padding:8px 12px; border-radius:8px; color:white; text-decoration:none; margin-bottom:4px; opacity:0.8">Import Data</a>
-            <a href="/admin/produk/upload-foto" style="display:block; padding:8px 12px; border-radius:8px; background:rgba(255,255,255,0.2); color:white; text-decoration:none; margin-bottom:4px">Upload Foto Produk</a>
-        </nav>
-        <div style="position:absolute; bottom:0; width:224px; padding:16px; border-top:1px solid rgba(255,255,255,0.2)">
-            <form method="POST" action="/logout">
-                @csrf
-                <button type="submit" style="background:none; border:none; color:rgba(255,255,255,0.6); cursor:pointer; font-size:14px">Keluar</button>
-            </form>
-        </div>
-    </aside>
+@section('title', 'Upload Foto Produk')
+@section('heading', 'Upload Foto Produk')
 
-    <main style="flex:1; overflow:auto">
-        <div style="background:white; border-bottom:1px solid #e5e7eb; padding:12px 24px">
-            <p style="font-size:14px; color:#6b7280; margin:0">Upload Foto Produk UMKM</p>
-        </div>
+@section('content')
+<div class="mx-auto max-w-3xl"
+     x-data="uploadFoto({ listUrl: @js(route('admin.produk.list', ['umkmId' => '__ID__'])), maks: {{ $maksProduk }}, awal: @js(old('umkm_id')) })"
+     x-init="init()">
 
-        <div style="max-width:700px; margin:32px auto; padding:0 16px">
+    <p class="mb-6 text-sm text-slate-500">
+        Unggah 1–{{ $maksProduk }} foto produk per UMKM. Foto pertama menjadi foto utama di halaman direktori.
+    </p>
 
-            <h1 style="font-size:20px; font-weight:700; color:#1f2937; margin-bottom:4px">Upload Foto Produk</h1>
-            <p style="font-size:14px; color:#6b7280; margin-bottom:24px">
-                Upload 1–10 foto produk untuk setiap UMKM. Foto pertama (urutan 1) akan tampil di halaman listing.
-            </p>
+    <form method="POST" action="{{ route('admin.produk.upload-foto.store') }}" enctype="multipart/form-data"
+          @submit="submit($event)"
+          class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        @csrf
 
-            @if(session('success'))
-            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#15803d; font-size:14px">
-                ✅ {{ session('success') }}
+        <div class="grid gap-5 sm:grid-cols-2">
+            {{-- UMKM --}}
+            <div class="sm:col-span-2">
+                <label for="umkm-select" class="mb-1.5 block text-sm font-medium text-slate-700">
+                    UMKM <span class="text-red-500">*</span>
+                </label>
+                <select name="umkm_id" id="umkm-select" required x-model="umkmId" @change="muatProduk()"
+                        class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-navy-700 focus:ring-navy-700">
+                    <option value="">— Pilih UMKM —</option>
+                    @foreach ($daftarUmkm as $umkm)
+                        <option value="{{ $umkm->id }}" @selected(old('umkm_id') == $umkm->id)>
+                            {{ $umkm->nama_usaha }} — {{ $umkm->kabupaten }}
+                        </option>
+                    @endforeach
+                </select>
+                @if ($daftarUmkm->isEmpty())
+                    <p class="mt-1.5 text-xs text-amber-700">Belum ada UMKM pada wilayah Anda. Import data terlebih dahulu.</p>
+                @endif
+                @error('umkm_id') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
-            @endif
 
-            @if(session('error'))
-            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:14px">
-                ❌ {{ session('error') }}
+            {{-- Nama produk --}}
+            <div>
+                <label for="nama_produk" class="mb-1.5 block text-sm font-medium text-slate-700">
+                    Nama produk <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="nama_produk" name="nama_produk" value="{{ old('nama_produk') }}" required maxlength="255"
+                       placeholder="Contoh: Kopi Arabika Kalbar"
+                       class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-navy-700 focus:ring-navy-700">
+                @error('nama_produk') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
-            @endif
 
-            {{-- Form Upload --}}
-            <div style="background:white; border:1px solid #e5e7eb; border-radius:12px; padding:24px; margin-bottom:20px">
-                <form method="POST" action="/admin/produk/upload-foto" enctype="multipart/form-data" id="upload-form">
-                    @csrf
+            {{-- Harga --}}
+            <div>
+                <label for="harga" class="mb-1.5 block text-sm font-medium text-slate-700">
+                    Harga <span class="font-normal text-slate-400">(opsional)</span>
+                </label>
+                <div class="relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-slate-400">Rp</span>
+                    <input type="number" id="harga" name="harga" value="{{ old('harga') }}" min="0" step="1" inputmode="numeric"
+                           placeholder="85000"
+                           class="w-full rounded-lg border-slate-300 pl-10 text-sm shadow-sm focus:border-navy-700 focus:ring-navy-700">
+                </div>
+                @error('harga') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            </div>
 
-                    {{-- Pilih UMKM --}}
-                    <div style="margin-bottom:16px">
-                        <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px">
-                            Pilih UMKM *
-                        </label>
-                        <select name="umkm_id" required id="umkm-select"
-                            style="width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:14px; color:#1f2937; background:white"
-                            onchange="loadProduk(this.value)">
-                            <option value="">-- Pilih UMKM --</option>
-                            @foreach(\App\Models\Umkm::orderBy('nama_usaha')->get(['id','nama_usaha','kabupaten']) as $umkm)
-                            <option value="{{ $umkm->id }}">{{ $umkm->nama_usaha }} — {{ $umkm->kabupaten }}</option>
-                            @endforeach
-                        </select>
-                        @error('umkm_id')
-                        <p style="color:#dc2626; font-size:12px; margin-top:4px">{{ $message }}</p>
-                        @enderror
-                    </div>
+            {{-- Foto --}}
+            <div class="sm:col-span-2">
+                <p class="mb-1.5 block text-sm font-medium text-slate-700">
+                    Foto produk <span class="text-red-500">*</span>
+                </p>
 
-                    {{-- Nama Produk --}}
-                    <div style="margin-bottom:16px">
-                        <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px">
-                            Nama Produk *
-                        </label>
-                        <input type="text" name="nama_produk" value="{{ old('nama_produk') }}"
-                            placeholder="Contoh: Kopi Arabika Kalbar"
-                            style="width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:14px; color:#1f2937; box-sizing:border-box"
-                            required>
-                        @error('nama_produk')
-                        <p style="color:#dc2626; font-size:12px; margin-top:4px">{{ $message }}</p>
-                        @enderror
-                    </div>
+                <label for="foto-input"
+                       @dragover.prevent="drag = true" @dragleave.prevent="drag = false" @drop.prevent="drop($event)"
+                       :class="drag ? 'border-navy-700 bg-navy-900/5' : 'border-slate-300 bg-slate-50 hover:border-navy-700'"
+                       class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition">
+                    <svg class="mb-2 h-9 w-9 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.83 6.18A2.31 2.31 0 0 1 5.2 7.25c-.38.05-.76.11-1.13.18C3.02 7.6 2.25 8.51 2.25 9.57V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.57c0-1.06-.77-1.97-1.82-2.14a47.6 47.6 0 0 0-1.13-.18 2.31 2.31 0 0 1-1.64-1.07l-.82-1.31a2.19 2.19 0 0 0-1.74-1.03 48.77 48.77 0 0 0-5.2 0 2.19 2.19 0 0 0-1.74 1.03l-.82 1.31ZM16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"/></svg>
+                    <p class="text-sm font-medium text-slate-700">Klik atau seret foto ke sini</p>
+                    <p class="mt-1 text-xs text-slate-400">JPG, PNG, WEBP · maks. 2 MB per foto · maks. <span x-text="sisa()"></span> foto</p>
+                </label>
+                <input type="file" id="foto-input" name="foto[]" x-ref="input" multiple
+                       accept="image/jpeg,image/png,image/webp" class="sr-only" @change="pilih($event.target.files)">
 
-                    {{-- Upload Foto (1-10) --}}
-                    <div style="margin-bottom:16px">
-                        <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px">
-                            Foto Produk (maks. 10 foto) *
-                        </label>
-                        <p style="font-size:12px; color:#6b7280; margin-bottom:8px">
-                            📌 Foto pertama yang dipilih akan tampil di halaman listing. Format: JPG, PNG, WEBP. Maks. 2MB per foto.
-                        </p>
+                <p x-show="clientError" x-text="clientError" x-cloak class="mt-2 text-sm text-red-600"></p>
+                @error('foto') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                @error('foto.*') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
 
-                        {{-- Drop zone --}}
-                        <div id="drop-zone"
-                            style="border:2px dashed #d1d5db; border-radius:10px; padding:32px 20px; text-align:center; cursor:pointer; transition:border-color 0.2s; background:#fafafa"
-                            onclick="document.getElementById('foto-input').click()"
-                            ondragover="handleDragOver(event)"
-                            ondrop="handleDrop(event)">
-                            <div style="font-size:36px; margin-bottom:8px">📸</div>
-                            <p style="font-size:14px; color:#374151; font-weight:500; margin:0 0 4px">
-                                Klik atau drag foto ke sini
-                            </p>
-                            <p style="font-size:12px; color:#9ca3af; margin:0">
-                                Pilih 1–10 foto sekaligus
-                            </p>
+                <div x-show="previews.length" x-cloak class="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
+                    <template x-for="(p, i) in previews" :key="p.url">
+                        <div class="relative aspect-square overflow-hidden rounded-lg border-2"
+                             :class="i === 0 ? 'border-green-600' : 'border-slate-200'">
+                            <img :src="p.url" :alt="p.name" class="h-full w-full object-cover">
+                            <span x-show="i === 0" class="absolute left-1 top-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">UTAMA</span>
+                            <button type="button" @click="hapus(i)"
+                                    class="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                                    :aria-label="'Hapus foto ' + (i + 1)">
+                                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                            </button>
                         </div>
-
-                        <input type="file" id="foto-input" name="foto[]"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple style="display:none"
-                            onchange="previewFoto(this)">
-
-                        @error('foto')
-                        <p style="color:#dc2626; font-size:12px; margin-top:4px">{{ $message }}</p>
-                        @enderror
-                        @error('foto.*')
-                        <p style="color:#dc2626; font-size:12px; margin-top:4px">{{ $message }}</p>
-                        @enderror
-
-                        {{-- Preview grid --}}
-                        <div id="preview-grid" style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px"></div>
-                        <p id="foto-count" style="font-size:12px; color:#6b7280; margin-top:8px; display:none"></p>
-                    </div>
-
-                    {{-- Harga (opsional) --}}
-                    <div style="margin-bottom:20px">
-                        <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px">
-                            Harga (opsional)
-                        </label>
-                        <input type="number" name="harga" value="{{ old('harga') }}"
-                            placeholder="Contoh: 85000"
-                            style="width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:14px; color:#1f2937; box-sizing:border-box">
-                    </div>
-
-                    <button type="submit" id="submit-btn"
-                        style="width:100%; background:#166534; color:white; border:none; border-radius:10px; padding:14px; font-size:15px; font-weight:600; cursor:pointer">
-                        💾 Simpan Foto Produk
-                    </button>
-                </form>
+                    </template>
+                </div>
+                <p x-show="previews.length" x-cloak class="mt-2 text-xs text-slate-500"
+                   x-text="previews.length + ' foto dipilih.'"></p>
             </div>
-
-            {{-- Daftar produk UMKM terpilih --}}
-            <div id="produk-list" style="display:none; background:white; border:1px solid #e5e7eb; border-radius:12px; padding:20px">
-                <h2 style="font-size:16px; font-weight:600; color:#1f2937; margin-bottom:12px">
-                    Produk yang sudah ada
-                </h2>
-                <div id="produk-items"></div>
-            </div>
-
         </div>
-    </main>
+
+        <button type="submit" :disabled="loading"
+                class="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-green-700 py-3 text-sm font-semibold text-white transition hover:bg-green-800 disabled:cursor-wait disabled:opacity-70">
+            <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.37 0 0 5.37 0 12h4z"/>
+            </svg>
+            <span x-text="loading ? 'Menyimpan...' : 'Simpan Foto Produk'">Simpan Foto Produk</span>
+        </button>
+    </form>
+
+    {{-- Produk yang sudah ada --}}
+    <section x-show="umkmId" x-cloak class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div class="mb-3 flex items-center justify-between">
+            <h2 class="font-semibold text-slate-900">Produk yang sudah ada</h2>
+            <span class="text-xs text-slate-500" x-text="produk.length + ' / ' + maks"></span>
+        </div>
+
+        <p x-show="memuat" class="py-4 text-center text-sm text-slate-400">Memuat...</p>
+        <p x-show="!memuat && !produk.length" class="py-4 text-center text-sm text-slate-400">Belum ada produk untuk UMKM ini.</p>
+
+        <ul x-show="!memuat && produk.length" class="divide-y divide-slate-100">
+            <template x-for="p in produk" :key="p.id">
+                <li class="flex items-center gap-3 py-3">
+                    <div class="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                        <img x-show="p.foto_url" :src="p.foto_url" :alt="p.nama_produk" class="h-full w-full object-cover">
+                    </div>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-900" x-text="p.nama_produk"></p>
+                        <p class="text-xs text-slate-500">
+                            Urutan <span x-text="p.urutan ?? '-'"></span>
+                            <span x-show="p.is_unggulan" class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">Unggulan</span>
+                        </p>
+                    </div>
+                </li>
+            </template>
+        </ul>
+    </section>
 </div>
+@endsection
 
+@push('scripts')
 <script>
-function previewFoto(input) {
-    const grid = document.getElementById('preview-grid');
-    const count = document.getElementById('foto-count');
-    grid.innerHTML = '';
+function uploadFoto({ listUrl, maks, awal }) {
+    const MAKS_UKURAN = 2 * 1024 * 1024;
+    const TIPE = ['image/jpeg', 'image/png', 'image/webp'];
 
-    const files = Array.from(input.files).slice(0, 10);
+    return {
+        umkmId: awal ? String(awal) : '', produk: [], memuat: false,
+        files: [], previews: [], drag: false, loading: false, clientError: '', maks,
 
-    if (files.length === 0) {
-        count.style.display = 'none';
-        return;
-    }
+        init() { if (this.umkmId) this.muatProduk(); },
 
-    files.forEach((file, i) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const div = document.createElement('div');
-            div.style.cssText = 'position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; border:2px solid ' + (i === 0 ? '#16a34a' : '#e5e7eb');
-            div.innerHTML = `
-                <img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">
-                ${i === 0 ? '<span style="position:absolute;top:4px;left:4px;background:#16a34a;color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">UTAMA</span>' : ''}
-                <span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:1px 5px;border-radius:3px">${i+1}</span>
-            `;
-            grid.appendChild(div);
-        };
-        reader.readAsDataURL(file);
-    });
+        sisa() { return Math.max(0, this.maks - (this.umkmId ? this.produk.length : 0)); },
 
-    count.style.display = 'block';
-    count.textContent = `${files.length} foto dipilih. Foto #1 akan tampil di halaman listing.`;
+        async muatProduk() {
+            this.produk = [];
+            if (!this.umkmId) return;
+            this.memuat = true;
+            try {
+                const r = await fetch(listUrl.replace('__ID__', encodeURIComponent(this.umkmId)), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                this.produk = r.ok ? await r.json() : [];
+            } finally {
+                this.memuat = false;
+            }
+        },
 
-    document.getElementById('drop-zone').style.borderColor = '#16a34a';
-}
+        pilih(list) {
+            this.clientError = '';
+            const masuk = Array.from(list || []);
+            const valid = masuk.filter(f => TIPE.includes(f.type) && f.size <= MAKS_UKURAN);
+            if (valid.length < masuk.length) {
+                this.clientError = 'Sebagian file dilewati: hanya JPG/PNG/WEBP dengan ukuran maks. 2 MB.';
+            }
+            const batas = this.sisa();
+            if (valid.length > batas) {
+                this.clientError = `Hanya ${batas} foto yang dapat ditambahkan untuk UMKM ini.`;
+            }
+            this.files = valid.slice(0, batas);
+            this.sinkron();
+        },
 
-function handleDragOver(e) {
-    e.preventDefault();
-    document.getElementById('drop-zone').style.borderColor = '#16a34a';
-}
+        drop(e) { this.drag = false; this.pilih(e.dataTransfer.files); },
 
-function handleDrop(e) {
-    e.preventDefault();
-    const input = document.getElementById('foto-input');
-    const dt = new DataTransfer();
-    Array.from(e.dataTransfer.files).slice(0, 10).forEach(f => dt.items.add(f));
-    input.files = dt.files;
-    previewFoto(input);
-}
+        hapus(i) { this.files.splice(i, 1); this.sinkron(); },
 
-function loadProduk(umkmId) {
-    if (!umkmId) {
-        document.getElementById('produk-list').style.display = 'none';
-        return;
-    }
-    fetch(`/admin/produk/list/${umkmId}`)
-        .then(r => r.json())
-        .then(data => {
-            const list = document.getElementById('produk-list');
-            const items = document.getElementById('produk-items');
-            if (data.length === 0) {
-                list.style.display = 'none';
+        sinkron() {
+            this.previews.forEach(p => URL.revokeObjectURL(p.url));
+            this.previews = this.files.map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+            const dt = new DataTransfer();
+            this.files.forEach(f => dt.items.add(f));
+            this.$refs.input.files = dt.files;
+        },
+
+        submit(e) {
+            if (!this.files.length) {
+                e.preventDefault();
+                this.clientError = 'Pilih minimal 1 foto.';
                 return;
             }
-            items.innerHTML = data.map(p => `
-                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f3f4f6">
-                    <div style="width:48px;height:48px;border-radius:6px;overflow:hidden;background:#f3f4f6;flex-shrink:0">
-                        ${p.foto ? `<img src="${p.foto_url}" style="width:100%;height:100%;object-fit:cover">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">🏪</div>'}
-                    </div>
-                    <div>
-                        <p style="font-size:13px;font-weight:600;color:#1f2937;margin:0">${p.nama_produk}</p>
-                        <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Urutan: ${p.urutan} ${p.is_unggulan ? '⭐' : ''}</p>
-                    </div>
-                </div>
-            `).join('');
-            list.style.display = 'block';
-        });
+            this.loading = true;
+        },
+    };
 }
-
-document.getElementById('upload-form').addEventListener('submit', function() {
-    const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
-    btn.textContent = 'Menyimpan...';
-});
 </script>
-
-</body>
-</html>
+@endpush

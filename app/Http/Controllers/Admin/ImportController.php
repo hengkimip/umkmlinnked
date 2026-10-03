@@ -3,72 +3,86 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Imports\UmkmImport;
+use App\Models\Opd;
+use App\Models\Umkm;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportController extends Controller
 {
     // Halaman form upload
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.import.index');
+        Gate::authorize('create', Umkm::class);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        return view('admin.import.index', [
+            'opd'       => $user->opd,
+            // Super Admin memilih OPD tujuan; Admin OPD terkunci ke OPD-nya
+            'daftarOpd' => $user->isSuperAdmin()
+                ? Opd::query()->orderBy('nama_opd')->get(['id', 'nama_opd', 'kabupaten'])
+                : collect(),
+        ]);
     }
 
     // Proses upload
     public function store(Request $request)
     {
+        Gate::authorize('create', Umkm::class);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
         $request->validate([
+            'opd_id' => $user->isSuperAdmin()
+                ? ['required', 'integer', 'exists:opd,id']
+                : ['prohibited'],
             'file' => [
                 'required',
                 'file',
-                'mimes:csv,xlsx,xls',
+                'extensions:csv,xlsx,xls',
+                'mimes:csv,txt,xlsx,xls',
                 'max:5120',
             ],
         ], [
-            'file.required' => 'File wajib dipilih.',
-            'file.mimes'    => 'Format file harus CSV atau Excel (.xlsx/.xls).',
-            'file.max'      => 'Ukuran file maksimal 5MB.',
+            'opd_id.required'   => 'Pilih OPD tujuan data.',
+            'opd_id.exists'     => 'OPD tidak ditemukan.',
+            'opd_id.prohibited' => 'Admin OPD tidak dapat memilih OPD lain.',
+            'file.required'   => 'File wajib dipilih.',
+            'file.extensions' => 'Format file harus CSV atau Excel (.xlsx/.xls).',
+            'file.mimes'      => 'Isi file tidak dikenali sebagai CSV atau Excel.',
+            'file.max'        => 'Ukuran file maksimal 5 MB.',
         ]);
 
-        // PERBAIKAN 1: gunakan Auth facade agar Intelephense tidak komplain
-        /** @var \App\Models\User $user */
-        $user  = Auth::user();
-        $opdId = ($user && $user->opd_id) ? (int) $user->opd_id : 1;
+        // Super Admin memilih OPD tujuan secara eksplisit; Admin OPD wajib
+        // terikat ke OPD-nya dan data impor otomatis masuk wilayahnya (FR-02, FR-15).
+        $opdId = $user->isSuperAdmin() ? $request->integer('opd_id') : $user->opd_id;
 
-        $import = new UmkmImport($opdId);
+        if (! $opdId) {
+            return back()->with('error', 'Akun Anda belum terhubung ke OPD. Hubungi Super Admin.');
+        }
 
-        Excel::import($import, $request->file('file'));
+        $import = new UmkmImport((int) $opdId);
 
-        $jumlahBerhasil = $import->imported;
-        $pesan          = "Berhasil mengimpor {$jumlahBerhasil} data UMKM.";
-$import = new UmkmImport($opdId);
+        try {
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $e) {
+            Log::error('Import UMKM gagal: ' . $e->getMessage(), ['user_id' => $user->id]);
 
-Excel::import($import, $request->file('file'));
+            return back()->with('error', 'File tidak dapat dibaca. Pastikan memakai template terbaru dan format CSV/Excel yang valid.');
+        }
 
-$jumlahBerhasil = $import->imported;
-$pesan          = "Berhasil mengimpor {$jumlahBerhasil} data UMKM.";
+        $pesan    = "Berhasil mengimpor {$import->imported} data UMKM.";
+        $failures = $import->errors();
 
-/** @var \App\Imports\UmkmImport $import */
-$failures = $import->failures();
-
-if ($failures->isNotEmpty()) {
-    // ... sisa kode
-}
-        // PERBAIKAN 2: gunakan failures() dari trait, bukan akses $errors langsung
-        $failures = $import->failures();
-
-        if ($failures->isNotEmpty()) { 
-            $pesanGagal = [];
-            foreach ($failures as $failure) {
-                $pesanGagal[] = "Baris {$failure->row()}: "
-                              . implode(', ', $failure->errors())
-                              . " (kolom: {$failure->attribute()})";
-            }
-
+        if ($failures->isNotEmpty()) {
             return redirect()->route('admin.import.index')
                 ->with('success', $pesan . " {$failures->count()} baris gagal diimpor.")
-                ->with('import_errors', $pesanGagal);
+                ->with('import_errors', $failures->all());
         }
 
         return redirect()->route('admin.import.index')
@@ -78,6 +92,8 @@ if ($failures->isNotEmpty()) {
     // Download template CSV
     public function template()
     {
+        Gate::authorize('create', Umkm::class);
+
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="template_import_umkm.csv"',

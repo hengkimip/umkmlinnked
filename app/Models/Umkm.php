@@ -10,7 +10,22 @@ use Spatie\Activitylog\LogOptions;
 class Umkm extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
-    
+
+    // Label tampilan untuk nilai kolom `sektor` (hasil UmkmImport::mapSektor)
+    public const SEKTOR_LABEL = [
+        'kuliner'     => 'Kuliner',
+        'fashion'     => 'Fesyen',
+        'kerajinan'   => 'Kerajinan',
+        'pertanian'   => 'Pertanian & Agro',
+        'perikanan'   => 'Perikanan',
+        'jasa'        => 'Jasa',
+        'teknologi'   => 'Teknologi',
+        'perdagangan' => 'Perdagangan',
+        'lainnya'     => 'Lainnya',
+    ];
+
+    public const KABUPATEN_KOSONG = 'Tidak Diketahui';
+
     protected $table = 'umkm';
     
     protected $fillable = [
@@ -116,6 +131,21 @@ class Umkm extends Model
         return $query->when($kecamatan, fn($q) => $q->where('kecamatan', $kecamatan));
     }
 
+    /**
+     * Batasi data sesuai wilayah pengguna (FR-02):
+     * super-admin melihat semua, admin-opd hanya UMKM OPD-nya.
+     */
+    public function scopeMilikPengguna($query, User $user)
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $user->opd_id
+            ? $query->where('opd_id', $user->opd_id)
+            : $query->whereRaw('1 = 0');
+    }
+
     public function scopeSearch($query, $keyword)
     {
         return $query->when($keyword, function ($q) use ($keyword) {
@@ -145,6 +175,34 @@ class Umkm extends Model
         };
     }
 
+    public function getSektorLabelAttribute(): string
+    {
+        return self::SEKTOR_LABEL[$this->sektor] ?? ucfirst((string) $this->sektor);
+    }
+
+    /**
+     * Daftar sektor aktif beserta jumlahnya untuk filter publik:
+     * hanya sektor yang benar-benar ada datanya, agar filter tidak kosong.
+     *
+     * @return array<string, array{label: string, count: int}>
+     */
+    public static function sektorTersedia($query = null): array
+    {
+        return ($query ?? static::query()->aktif())
+            ->toBase()
+            ->reorder()
+            ->select('sektor', \Illuminate\Support\Facades\DB::raw('count(*) as jumlah'))
+            ->whereNotNull('sektor')
+            ->groupBy('sektor')
+            ->orderByDesc('jumlah')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->sektor => [
+                'label' => self::SEKTOR_LABEL[$r->sektor] ?? ucfirst($r->sektor),
+                'count' => (int) $r->jumlah,
+            ]])
+            ->all();
+    }
+
     /**
      * Get kabupaten lengkap untuk peta (Pontianak → Kota Pontianak)
      */
@@ -162,6 +220,90 @@ class Umkm extends Model
         $n = preg_replace('/[^0-9]/', '', $this->whatsapp);
         $n = preg_replace('/^0/', '62', $n);
         return "https://wa.me/{$n}";
+    }
+
+    // ==================== TAUTAN PUBLIK AMAN ====================
+    // Data sosmed/marketplace hasil import bentuknya beragam ("Eduscale.id", "-",
+    // "Blibli: https://... Tokopedia:https://..."). Helper ini hanya mengembalikan
+    // URL http(s) yang valid, sehingga nilai seperti "javascript:..." tidak pernah
+    // sampai ke atribut href.
+
+    public function instagramUrl(): ?string
+    {
+        $v = trim((string) $this->instagram);
+        if ($url = self::cariUrl($v, 'instagram.com')) {
+            return $url;
+        }
+        // Handle tanpa URL, mis. "@kopikapuas" atau "Eduscale.id"
+        if (preg_match('/^@?([A-Za-z0-9._]{2,30})$/', $v, $m)) {
+            return 'https://www.instagram.com/' . rtrim($m[1], '.') . '/';
+        }
+        return null;
+    }
+
+    // Kolom import "urllink_instagram_usaha_facebook" kadang berisi URL Facebook
+    public function facebookUrl(): ?string
+    {
+        return self::cariUrl((string) $this->facebook, 'facebook.com')
+            ?? self::cariUrl((string) $this->instagram, 'facebook.com')
+            ?? self::cariUrl((string) $this->instagram, 'fb.com');
+    }
+
+    public function marketplaceUrl(string $platform): ?string
+    {
+        return self::cariUrl((string) $this->{$platform}, $platform);
+    }
+
+    public function websiteUrl(): ?string
+    {
+        $v = trim((string) $this->website);
+        if ($url = self::cariUrl($v)) {
+            return $url;
+        }
+        // Domain tanpa skema, mis. "eduscale.id"
+        if (preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i', $v)) {
+            return self::validUrl('https://' . $v);
+        }
+        return null;
+    }
+
+    /**
+     * Tautan WhatsApp dengan pesan pembuka (FR-09).
+     */
+    public function waPesanLink(?string $produk = null): ?string
+    {
+        if (! $this->wa_link) {
+            return null;
+        }
+        $pesan = $produk
+            ? "Halo {$this->nama_usaha}, saya tertarik dengan produk \"{$produk}\" yang saya lihat di UMKMLinked.ID. Apakah masih tersedia?"
+            : "Halo {$this->nama_usaha}, saya melihat usaha Anda di UMKMLinked.ID dan ingin bertanya tentang produknya.";
+
+        return $this->wa_link . '?text=' . rawurlencode($pesan);
+    }
+
+    private static function cariUrl(string $teks, ?string $domain = null): ?string
+    {
+        preg_match_all('#https?://[^\s"\'<>]+#i', $teks, $m);
+        $urls = array_values(array_filter(array_map(fn ($u) => self::validUrl(rtrim($u, '.,;)')), $m[0])));
+        if ($domain) {
+            // Ketat: label "Tokopedia" hanya untuk URL ber-domain tokopedia, dst.
+            foreach ($urls as $u) {
+                if (str_contains(strtolower((string) parse_url($u, PHP_URL_HOST)), $domain)) {
+                    return $u;
+                }
+            }
+            return null;
+        }
+        return $urls[0] ?? null;
+    }
+
+    private static function validUrl(string $url): ?string
+    {
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        return in_array($scheme, ['http', 'https'], true) && filter_var($url, FILTER_VALIDATE_URL)
+            ? $url
+            : null;
     }
 
     /**

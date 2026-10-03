@@ -4,35 +4,41 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function adminOpd(): User
+    {
+        Role::firstOrCreate(['name' => User::ROLE_ADMIN_OPD, 'guard_name' => 'web']);
+
+        return User::factory()->create()->assignRole(User::ROLE_ADMIN_OPD);
+    }
+
     public function test_profile_page_is_displayed(): void
     {
-        $user = User::factory()->create();
+        $this->actingAs($this->adminOpd())
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Ganti kata sandi')
+            ->assertDontSee('Hapus akun');
+    }
 
-        $response = $this
-            ->actingAs($user)
-            ->get('/profile');
-
-        $response->assertOk();
+    public function test_profile_requires_admin_role(): void
+    {
+        $this->get('/profile')->assertRedirect('/login');
+        $this->actingAs(User::factory()->create())->get('/profile')->assertForbidden();
     }
 
     public function test_profile_information_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $user = $this->adminOpd();
 
-        $response = $this
-            ->actingAs($user)
-            ->patch('/profile', [
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ]);
-
-        $response
+        $this->actingAs($user)
+            ->patch('/profile', ['name' => 'Test User', 'email' => 'test@example.com'])
             ->assertSessionHasNoErrors()
             ->assertRedirect('/profile');
 
@@ -45,54 +51,36 @@ class ProfileTest extends TestCase
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
     {
-        $user = User::factory()->create();
+        $user = $this->adminOpd();
 
-        $response = $this
-            ->actingAs($user)
-            ->patch('/profile', [
-                'name' => 'Test User',
-                'email' => $user->email,
-            ]);
-
-        $response
+        $this->actingAs($user)
+            ->patch('/profile', ['name' => 'Test User', 'email' => $user->email])
             ->assertSessionHasNoErrors()
             ->assertRedirect('/profile');
 
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_profile_update_cannot_change_role_or_opd(): void
     {
-        $user = User::factory()->create();
+        $user = $this->adminOpd();
 
-        $response = $this
-            ->actingAs($user)
-            ->delete('/profile', [
-                'password' => 'password',
-            ]);
+        $this->actingAs($user)->patch('/profile', [
+            'name' => 'X', 'email' => $user->email, 'opd_id' => 999, 'is_active' => false,
+        ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
-
-        $this->assertGuest();
-        $this->assertNull($user->fresh());
+        $user->refresh();
+        $this->assertNull($user->opd_id);
+        $this->assertTrue($user->is_active);
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_users_cannot_delete_their_own_account(): void
     {
-        $user = User::factory()->create();
+        $user = $this->adminOpd();
 
-        $response = $this
-            ->actingAs($user)
-            ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
-            ]);
-
-        $response
-            ->assertSessionHasErrorsIn('userDeletion', 'password')
-            ->assertRedirect('/profile');
+        $this->actingAs($user)
+            ->delete('/profile', ['password' => 'password'])
+            ->assertStatus(405);
 
         $this->assertNotNull($user->fresh());
     }

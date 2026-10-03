@@ -25,9 +25,12 @@ class GoDigitalController extends Controller
                   );
             });
 
+        // Basis sebelum filter, untuk daftar sektor yang tersedia
+        $basis = clone $query;
+
         // Filter: Search
         if ($request->filled('q')) {
-            $q = $request->q;
+            $q = mb_substr(trim((string) $request->q), 0, 100);
             $query->where(function ($sub) use ($q) {
                 $sub->where('nama_usaha', 'like', "%{$q}%")
                     ->orWhere('sektor', 'like', "%{$q}%")
@@ -97,16 +100,8 @@ class GoDigitalController extends Controller
             ->filter()
             ->values();
 
-        $kategoriList = [
-            'kuliner'    => 'Makanan Berat dan Bumbu',
-            'minuman'    => 'Minuman dan Madu',
-            'camilan'    => 'Camilan dan Kue',
-            'fashion'    => 'Pakaian',
-            'aksesoris'  => 'Aksesoris',
-            'kerajinan'  => 'Kerajinan',
-            'pertanian'  => 'Pertanian & Agro',
-            'jasa'       => 'Jasa & Layanan',
-        ];
+        // Hanya sektor yang benar-benar ada di cakupan Go Digital
+        $kategoriList = Umkm::sektorTersedia($basis);
 
         $platformList = [
             'tokopedia' => 'Tokopedia',
@@ -117,12 +112,19 @@ class GoDigitalController extends Controller
         ];
 
         // Statistik Go Digital
+        $agg = Umkm::aktif()->toBase()->selectRaw('
+            sum(case when tokopedia is not null then 1 else 0 end) as tokopedia,
+            sum(case when shopee is not null then 1 else 0 end) as shopee,
+            sum(case when instagram is not null then 1 else 0 end) as instagram,
+            sum(case when whatsapp is not null then 1 else 0 end) as whatsapp
+        ')->first();
+
         $stats = [
-            'total'      => $query->count(),
-            'tokopedia'  => Umkm::aktif()->whereNotNull('tokopedia')->count(),
-            'shopee'     => Umkm::aktif()->whereNotNull('shopee')->count(),
-            'instagram'  => Umkm::aktif()->whereNotNull('instagram')->count(),
-            'whatsapp'   => Umkm::aktif()->whereNotNull('whatsapp')->count(),
+            ['value' => $umkm->total(),            'label' => 'UMKM Go Digital', 'highlight' => true],
+            ['value' => (int) $agg->tokopedia,     'label' => 'Tokopedia'],
+            ['value' => (int) $agg->shopee,        'label' => 'Shopee'],
+            ['value' => (int) $agg->instagram,     'label' => 'Instagram'],
+            ['value' => (int) $agg->whatsapp,      'label' => 'WhatsApp'],
         ];
 
         return view('public.go-digital', compact(

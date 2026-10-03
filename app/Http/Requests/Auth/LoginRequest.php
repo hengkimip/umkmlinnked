@@ -46,8 +46,25 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'Email atau kata sandi tidak sesuai.',
             ]);
+        }
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Akun nonaktif atau tanpa peran admin tidak boleh masuk panel (FR-01)
+        $pesanTolak = match (true) {
+            ! $user->is_active    => 'Akun Anda dinonaktifkan. Hubungi Super Admin.',
+            ! $user->isAdminAny() => 'Akun Anda belum memiliki peran akses. Hubungi Super Admin.',
+            default               => null,
+        };
+
+        if ($pesanTolak) {
+            Auth::guard('web')->logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages(['email' => $pesanTolak]);
         }
 
         RateLimiter::clear($this->throttleKey());
@@ -69,10 +86,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => "Terlalu banyak percobaan masuk. Coba lagi dalam {$seconds} detik.",
         ]);
     }
 
