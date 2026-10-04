@@ -36,7 +36,9 @@ return [
 
         'array' => [
             'driver' => 'array',
-            'serialize' => false,
+            // Tes menyalakan ini agar perilakunya sama dengan cache sungguhan
+            // (objek tidak boleh di-unserialize, lihat serializable_classes)
+            'serialize' => (bool) env('CACHE_ARRAY_SERIALIZE', false),
         ],
 
         'database' => [

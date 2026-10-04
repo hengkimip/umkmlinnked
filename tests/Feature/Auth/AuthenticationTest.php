@@ -34,7 +34,7 @@ class AuthenticationTest extends TestCase
         $response = $this->post('/login', ['email' => $user->email, 'password' => 'password']);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('admin.peta-interaktif', absolute: false));
+        $response->assertRedirect(route('superadmin.peta-interaktif', absolute: false));
     }
 
     public function test_admin_opd_is_redirected_to_dashboard(): void

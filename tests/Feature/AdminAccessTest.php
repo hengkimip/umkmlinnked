@@ -60,7 +60,7 @@ class AdminAccessTest extends TestCase
 
     public function test_guest_is_redirected_from_admin_pages(): void
     {
-        foreach (['/admin/dashboard', '/admin/import', '/admin/produk/upload-foto', '/admin/peta-interaktif', '/admin/peta-interaktif/data'] as $url) {
+        foreach (['/admin/dashboard', '/admin/import', '/admin/produk/upload-foto', '/superadmin/peta-interaktif', '/superadmin/peta-interaktif/data'] as $url) {
             $this->get($url)->assertRedirect('/login');
         }
     }
@@ -73,11 +73,11 @@ class AdminAccessTest extends TestCase
 
     public function test_peta_interaktif_is_super_admin_only(): void
     {
-        $this->actingAs($this->adminOpd())->get('/admin/peta-interaktif')->assertForbidden();
-        $this->actingAs($this->adminOpd())->get('/admin/peta-interaktif/data')->assertForbidden();
+        $this->actingAs($this->adminOpd())->get('/superadmin/peta-interaktif')->assertForbidden();
+        $this->actingAs($this->adminOpd())->get('/superadmin/peta-interaktif/data')->assertForbidden();
 
-        $this->actingAs($this->superAdmin())->get('/admin/peta-interaktif')->assertOk();
-        $this->actingAs($this->superAdmin())->getJson('/admin/peta-interaktif/data')->assertOk();
+        $this->actingAs($this->superAdmin())->get('/superadmin/peta-interaktif')->assertOk();
+        $this->actingAs($this->superAdmin())->getJson('/superadmin/peta-interaktif/data')->assertOk();
     }
 
     public function test_user_without_role_is_forbidden(): void
@@ -141,6 +141,124 @@ class AdminAccessTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertSame(2, $umkm->produk()->count());
+    }
+
+    public function test_uploaded_photo_gets_light_webp_thumbnail(): void
+    {
+        Storage::fake('public');
+        $umkm = $this->umkm($this->opdA);
+
+        $this->actingAs($this->adminOpd($this->opdA))->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi',
+            'foto'    => [UploadedFile::fake()->image('besar.jpg', 2000, 2500)],
+        ])->assertSessionHas('success');
+
+        $produk = $umkm->produk()->first();
+        $thumb  = \App\Support\Thumbnail::path($produk->foto);
+
+        Storage::disk('public')->assertExists($thumb);
+        $this->assertSame(\App\Support\Thumbnail::LEBAR, getimagesize(Storage::disk('public')->path($thumb))[0]);
+        $this->assertStringEndsWith('.webp', $produk->foto_kecil);
+        $this->assertStringEndsWith('.jpg', $produk->foto_final); // foto asli tetap untuk tampilan besar
+
+        // Hapus foto → thumbnail ikut terhapus
+        $this->actingAs($this->adminOpd($this->opdA))->deleteJson("/admin/produk/{$produk->id}/foto")->assertOk();
+        Storage::disk('public')->assertMissing($thumb);
+    }
+
+    public function test_badge_unggulan_becomes_the_only_main_photo(): void
+    {
+        Storage::fake('public');
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd($this->opdA);
+
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi',
+            'foto'  => [UploadedFile::fake()->image('a.jpg')],
+        ])->assertSessionHas('success');
+
+        // Foto pertama UMKM tanpa badge otomatis jadi unggulan
+        $this->assertSame('unggulan', $umkm->produk()->first()->badge);
+
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Teh',
+            'foto'  => [UploadedFile::fake()->image('b.jpg'), UploadedFile::fake()->image('c.jpg')],
+            'badge' => ['promo', 'unggulan'],
+        ])->assertSessionHas('success');
+
+        $utama = $umkm->produk()->where('is_unggulan', true)->get();
+        $this->assertCount(1, $utama);
+        $this->assertSame('Teh (foto 2)', $utama->first()->nama_produk);
+        $this->assertSame(1, $umkm->produk()->where('badge', 'unggulan')->count());
+        $this->assertSame(1, $umkm->produk()->where('badge', 'promo')->count());
+    }
+
+    public function test_upload_rejects_more_than_one_unggulan_or_unknown_badge(): void
+    {
+        Storage::fake('public');
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd($this->opdA);
+        $foto  = fn () => [UploadedFile::fake()->image('a.jpg'), UploadedFile::fake()->image('b.jpg')];
+
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi', 'foto' => $foto(), 'badge' => ['unggulan', 'unggulan'],
+        ])->assertSessionHas('error');
+
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi', 'foto' => $foto(), 'badge' => ['diskon', ''],
+        ])->assertSessionHasErrors('badge.0');
+
+        $this->assertSame(0, $umkm->produk()->count());
+    }
+
+    public function test_admin_can_update_and_clear_product_photo_and_description(): void
+    {
+        Storage::fake('public');
+        $umkm   = $this->umkm($this->opdA);
+        $admin  = $this->adminOpd($this->opdA);
+        $path   = UploadedFile::fake()->image('a.jpg')->store('produk/foto', 'public');
+        $produk = $umkm->produk()->create(['nama_produk' => 'Kopi', 'foto' => $path, 'deskripsi' => 'Lama', 'urutan' => 1]);
+
+        $this->actingAs($admin)->patchJson("/admin/produk/{$produk->id}", [
+            'nama_produk' => 'Kopi Robusta', 'harga' => 50000, 'deskripsi' => 'Kemasan 250 g', 'badge' => 'terlaris',
+        ])->assertOk()->assertJsonPath('produk.badge', 'terlaris');
+
+        $produk->refresh();
+        $this->assertSame('Kopi Robusta', $produk->nama_produk);
+        $this->assertSame('Kemasan 250 g', $produk->deskripsi);
+
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}/keterangan")->assertOk();
+        $this->assertNull($produk->fresh()->deskripsi);
+
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}/foto")->assertOk();
+        $this->assertNull($produk->fresh()->foto);
+        Storage::disk('public')->assertMissing($path);
+
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}")->assertOk();
+        $this->assertModelMissing($produk);
+    }
+
+    public function test_admin_opd_cannot_manage_products_outside_region(): void
+    {
+        $produk = $this->umkm($this->opdB)->produk()->create(['nama_produk' => 'Kopi', 'deskripsi' => 'X', 'urutan' => 1]);
+        $admin  = $this->adminOpd($this->opdA);
+
+        $this->actingAs($admin)->patchJson("/admin/produk/{$produk->id}", ['nama_produk' => 'Ubah'])->assertForbidden();
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}/keterangan")->assertForbidden();
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}/foto")->assertForbidden();
+        $this->actingAs($admin)->deleteJson("/admin/produk/{$produk->id}")->assertForbidden();
+
+        $this->assertSame('X', $produk->fresh()->deskripsi);
+    }
+
+    public function test_product_update_returns_json_validation_errors(): void
+    {
+        $produk = $this->umkm($this->opdA)->produk()->create(['nama_produk' => 'Kopi', 'urutan' => 1]);
+
+        $this->actingAs($this->adminOpd($this->opdA))
+            ->patchJson("/admin/produk/{$produk->id}", ['nama_produk' => '', 'badge' => 'diskon'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['nama_produk', 'badge']);
     }
 
     public function test_import_rejects_non_spreadsheet_files(): void

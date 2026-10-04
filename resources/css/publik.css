@@ -1,0 +1,6 @@
+/* Tailwind ramping untuk halaman publik (pengganti app.css di layout publik) */
+@config "../../tailwind.publik.config.js";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

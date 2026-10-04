@@ -7,6 +7,8 @@ use App\Models\Legalitas;
 use App\Models\Pemasaran;
 use App\Models\Keuangan;
 use App\Models\Produk;
+use App\Models\ProfilUmkm;
+use App\Services\ProfilUmkmService;
 use App\Services\UmkmScoringService;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -95,64 +97,75 @@ class UmkmImport implements
                     ]);
 
                     // 4. Legalitas
-                    $legalitasRaw  = strtolower($row['bentuk_legalitas_usaha_yang_dimiliki'] ?? '');
-                    $sertifRaw     = strtolower($row['sertifikasi_produk_yang_dimiliki'] ?? '');
+                    $legalitasRaw = $this->teks($row, 'bentuk_legalitas_usaha_yang_dimiliki');
+                    $sertifRaw    = $this->teks($row, 'sertifikasi_produk_yang_dimiliki');
+                    $adaLegal     = ProfilUmkmService::legalitasDari($legalitasRaw, $sertifRaw);
 
-                    Legalitas::create([
-                        'umkm_id'     => $umkm->id,
-                        'nomor_nib'   => str_contains($legalitasRaw, 'nib')  ? 'ADA' : null,
-                        'nomor_siup'  => str_contains($legalitasRaw, 'siup') ? 'ADA' : null,
-                        'nomor_npwp'  => str_contains($legalitasRaw, 'npwp') ? 'ADA' : null,
-                        'nomor_halal' => str_contains($sertifRaw, 'halal')   ? 'ADA' : null,
-                        'nomor_bpom'  => str_contains($sertifRaw, 'bpom')    ? 'ADA' : null,
-                        'nomor_pirt'  => str_contains($sertifRaw, 'pirt')    ? 'ADA' : null,
-                    ]);
+                    Legalitas::create(['umkm_id' => $umkm->id] + array_map(fn ($ada) => $ada ? 'ADA' : null, $adaLegal));
 
                     // 5. Pemasaran
-                    $saluranRaw   = strtolower($row['saluran_pemasaran_produk_selama_ini'] ?? '');
+                    $saluranRaw   = $this->teks($row, 'saluran_pemasaran_produk_selama_ini');
                     $jangkauanRaw = strtolower($row['jangkauan_pasar_utama_saat_ini'] ?? '');
-                    $platforms    = [];
-                    foreach (['tokopedia','shopee','tiktok','instagram','facebook','whatsapp'] as $p) {
-                        if (str_contains($saluranRaw, $p)) $platforms[] = $p;
-                    }
 
                     Pemasaran::create([
                         'umkm_id'          => $umkm->id,
-                        'platform_online'  => $platforms,
+                        'platform_online'  => ProfilUmkmService::platformDari($saluranRaw),
                         'jangkauan_pasar'  => $this->mapJangkauan($jangkauanRaw),
                         'memiliki_website' => !empty($row['url_link_website']),
                     ]);
 
                     // 6. Keuangan
-                    $omzetRaw = $this->cleanAngka($row['berapa_rata_rata_omzet_usaha_anda_perbulan'] ?? '0');
+                    $omzetRaw     = $this->cleanAngka($row['berapa_rata_rata_omzet_usaha_anda_perbulan'] ?? '0');
+                    $pencatatan   = $this->teks($row, 'bagaimana_metode_pencatatan_keuangan_usaha_anda_saat_ini');
 
                     Keuangan::create([
                         'umkm_id'             => $umkm->id,
                         'tahun'               => date('Y'),
                         'omzet_tahunan'       => $omzetRaw * 12,
-                        'memiliki_pencatatan' => str_contains(
-                            strtolower($row['bagaimana_metode_pencatatan_keuangan_usaha_anda_saat_ini'] ?? ''),
-                            'digital'
-                        ) || str_contains(
-                            strtolower($row['bagaimana_metode_pencatatan_keuangan_usaha_anda_saat_ini'] ?? ''),
-                            'aplikasi'
-                        ),
+                        'memiliki_pencatatan' => ProfilUmkmService::punyaPencatatan($pencatatan),
                     ]);
 
-                    // 7. Produk unggulan
+                    // 7. Jawaban kuesioner apa adanya (ditampilkan & diubah di "Kelola Profil UMKM").
+                    //    Judul kolom pembiayaan: versi template (pendek) atau versi formulir (panjang).
+                    ProfilUmkm::create([
+                        'umkm_id'                  => $umkm->id,
+                        'program_bi'               => $this->teks($row, 'program_yang_pernah_diikuti_dari_bank_indonesia'),
+                        'produk_lainnya'           => $this->teks($row, 'apakah_memiliki_jenis_produk_lainnya_mohon_disebutkan_secara_spesifik'),
+                        'kapasitas_produk_lainnya' => $this->teks($row, 'berapa_kapasitas_produksi_produk_tersebut'),
+                        'saluran_pemasaran'        => $saluranRaw,
+                        'marketplace'              => $this->teks($row, 'urllink_marketplace_usaha_yang_dimiliki'),
+                        'bentuk_legalitas'         => $legalitasRaw,
+                        'sertifikasi_produk'       => $sertifRaw,
+                        'metode_pencatatan'        => $pencatatan,
+                        'pembiayaan_2026'          => mb_substr((string) $this->teks($row,
+                            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan',
+                            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan_dari_lembaga_keuangan_perbankan_dan_atau_non_perbankan'), 0, 255) ?: null,
+                        'pembiayaan_diterima'      => $this->teks($row,
+                            'jika_sudah_sebutkan_nama_lembaga_dan_jumlah_plafond',
+                            'jika_sudah_mendapatkan_akses_pembiayaan_sebutkan_nama_lembaga_keuangan_dan_jumlah_plafond_yang_diterima'),
+                        'rencana_pembiayaan'       => $this->teks($row,
+                            'jika_ada_rencana_sebutkan_nama_lembaga_dan_jumlah_plafond',
+                            'jika_ada_rencana_akses_pembiayaan_sebutkan_nama_lembaga_keuangan_dan_jumlah_plafond_yang_akan_diajukan'),
+                    ]);
+
+                    // 8. Produk unggulan
                     $produkUnggulan = $row['produk_jasa_unggulan'] ?? null;
                     if ($produkUnggulan) {
+                        $fotoUrl = $this->teks($row, 'foto_url', 'foto_produk');
+
                         Produk::create([
                             'umkm_id'            => $umkm->id,
                             'nama_produk'        => $produkUnggulan,
                             'kapasitas_produksi' => $this->cleanAngka($row['kapasitas_produksi_per_bulan_pcskg'] ?? '0'),
                             'satuan_kapasitas'   => 'bulan',
+                            'foto_url'           => $fotoUrl && preg_match('#^https?://#i', $fotoUrl) ? $fotoUrl : null,
                             'is_unggulan'        => true,
+                            'badge'              => 'unggulan',
                             'is_active'          => true,
                         ]);
                     }
 
-                    // 8. Hitung skor otomatis
+                    // 9. Hitung skor otomatis
                     $this->scoring->simpan($umkm);
                 });
 
@@ -223,6 +236,18 @@ private function konversiUrlDownload(string $url): string
 }
     // ===== HELPER METHODS =====
 
+    /**
+     * Teks jawaban dari kolom pertama yang terisi (null bila kosong / "-").
+     */
+    private function teks($row, string ...$kunci): ?string
+    {
+        foreach ($kunci as $k) {
+            $v = trim((string) ($row[$k] ?? ''));
+            if ($v !== '' && $v !== '-') return $v;
+        }
+        return null;
+    }
+
     private function cleanPhone(?string $phone): string
     {
         if (!$phone) return '';
@@ -247,15 +272,7 @@ private function konversiUrlDownload(string $url): string
 
     private function extractKabupaten(string $alamat): string
     {
-        $kalbar = [
-            'Pontianak','Singkawang','Sambas','Bengkayang','Landak',
-            'Mempawah','Sanggau','Sekadau','Sintang','Melawi',
-            'Kapuas Hulu','Ketapang','Kayong Utara','Kubu Raya',
-        ];
-        foreach ($kalbar as $kab) {
-            if (stripos($alamat, $kab) !== false) return $kab;
-        }
-        return 'Tidak Diketahui';
+        return Umkm::tebakKabupaten($alamat) ?? Umkm::KABUPATEN_KOSONG;
     }
 
     private function mapSektor(string $sektor): string

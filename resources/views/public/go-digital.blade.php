@@ -20,7 +20,7 @@
                 <legend class="ib-section-title">Platform digital</legend>
                 @foreach ($platformList as $key => $label)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="platform" data-filter-value="{{ $key }}" @checked(request('platform') === $key)>
+                        <input type="checkbox" data-filter-key="platform" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('platform') === $key)>
                         <span>{{ $label }}</span>
                     </label>
                 @endforeach
@@ -32,7 +32,7 @@
                 <legend class="ib-section-title">Sektor usaha</legend>
                 @foreach ($kategoriList as $key => $s)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(request('sektor') === $key)>
+                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('sektor') === $key)>
                         <span>{{ $s['label'] }}</span>
                         <small>{{ $s['count'] }}</small>
                     </label>

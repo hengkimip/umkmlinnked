@@ -3,9 +3,15 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Models\Keuangan;
+use App\Models\Legalitas;
+use App\Models\Pemasaran;
+use App\Models\Produk;
+use App\Models\ProfilUmkm;
 use App\Models\Umkm;
 use App\Models\User;
 use App\Policies\UmkmPolicy;
+use App\Support\CacheData;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rules\Password;
@@ -37,6 +43,12 @@ class AppServiceProvider extends ServiceProvider
 
         // ==================== POLICIES ====================
         Gate::policy(Umkm::class, UmkmPolicy::class);
+
+        // Cache data UMKM (beranda, statistik, peta) dibatalkan setiap kali datanya berubah
+        foreach ([Umkm::class, Produk::class, Pemasaran::class, Legalitas::class, Keuangan::class, ProfilUmkm::class] as $model) {
+            $model::saved(fn () => CacheData::segarkan());
+            $model::deleted(fn () => CacheData::segarkan());
+        }
 
         // ==================== ROLE-BASED GATES ====================
         

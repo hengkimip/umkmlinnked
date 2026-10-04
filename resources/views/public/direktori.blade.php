@@ -20,7 +20,7 @@
                 <legend class="ib-section-title">Sektor usaha</legend>
                 @foreach ($sektorList as $key => $s)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(request('sektor') === $key)>
+                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('sektor') === $key)>
                         <span>{{ $s['label'] }}</span>
                         <small>{{ $s['count'] }}</small>
                     </label>
@@ -34,11 +34,11 @@
                 <div class="ib-price-row">
                     <div>
                         <label for="harga_min" class="ib-price-label">Minimum (Rp)</label>
-                        <input type="number" id="harga_min" min="0" step="1000" inputmode="numeric" value="{{ request('harga_min') }}" class="ib-price-input">
+                        <input type="number" id="harga_min" min="0" step="1000" inputmode="numeric" value="{{ \App\Support\FilterUmkm::nilai('harga_min') }}" class="ib-price-input">
                     </div>
                     <div>
                         <label for="harga_max" class="ib-price-label">Maksimum (Rp)</label>
-                        <input type="number" id="harga_max" min="0" step="1000" inputmode="numeric" value="{{ request('harga_max') }}" class="ib-price-input">
+                        <input type="number" id="harga_max" min="0" step="1000" inputmode="numeric" value="{{ \App\Support\FilterUmkm::nilai('harga_max') }}" class="ib-price-input">
                     </div>
                 </div>
                 <button type="button" id="apply-harga-btn" class="ib-apply-btn">Terapkan harga</button>

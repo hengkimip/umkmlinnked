@@ -134,6 +134,8 @@ function initGallery() {
     const name = gallery.querySelector("[data-gallery-name]");
     const price = gallery.querySelector("[data-gallery-price]");
     const wa = gallery.querySelector("[data-gallery-wa]");
+    const desc = gallery.querySelector("[data-gallery-desc]");
+    const badge = gallery.querySelector("[data-gallery-badge]");
     const thumbs = gallery.querySelectorAll("[data-thumb-src]");
 
     thumbs.forEach((thumb) => {
@@ -153,6 +155,16 @@ function initGallery() {
                 } else {
                     price.textContent = "Harga dapat ditanyakan langsung ke penjual";
                 }
+            }
+            if (desc) {
+                desc.textContent = thumb.dataset.thumbDesc || "";
+                desc.hidden = !thumb.dataset.thumbDesc;
+            }
+            if (badge) {
+                const kode = thumb.dataset.thumbBadge || "";
+                badge.textContent = thumb.dataset.thumbBadgeLabel || "";
+                badge.className = "ib-badge" + (/^[a-z]+$/.test(kode) ? ` ib-badge--${kode}` : "");
+                badge.hidden = !thumb.dataset.thumbBadgeLabel;
             }
             if (wa && /^https:\/\/wa\.me\/\d{8,15}\?text=/.test(thumb.dataset.thumbWa || "")) {
                 wa.href = thumb.dataset.thumbWa;
@@ -185,7 +197,110 @@ function initShare() {
     });
 }
 
+/**
+ * Beranda: 4 kartu per baris berganti acak dari kartu cadangan (<template>).
+ * - hanya berjalan saat baris terlihat di layar & tab aktif (hemat CPU/kuota)
+ * - berhenti saat kursor/fokus keyboard di baris, atau tombol jeda ditekan (WCAG 2.2.2)
+ * - gambar kartu berikutnya dimuat dulu agar pergantian tidak berkedip
+ */
+function initRotasiProduk() {
+    const JEDA = 5500; // ms antar-pergantian
+    const acak = (daftar) => {
+        const a = [...daftar];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    };
+    const muatGambar = (li) =>
+        new Promise((selesai) => {
+            const src = li.querySelector("img")?.getAttribute("src");
+            if (!src) return selesai();
+            const img = new Image();
+            img.onload = img.onerror = selesai;
+            img.src = src;
+            setTimeout(selesai, 4000);
+        });
+
+    document.querySelectorAll("[data-rotasi]").forEach((grid) => {
+        const rail = grid.closest(".ib-rail");
+        const template = rail?.querySelector("template[data-rotasi-cadangan]");
+        const tombol = rail?.querySelector("[data-rotasi-jeda]");
+        if (!template) return;
+
+        let tampil = [...grid.children];
+        let cadangan = [...template.content.children].map((n) => n.cloneNode(true));
+        let dijeda = false;
+        let disentuh = false;
+        let terlihat = false;
+        let sibuk = false;
+        let timer = null;
+
+        const bolehJalan = () => !dijeda && !disentuh && terlihat && !document.hidden;
+
+        const ganti = async () => {
+            if (sibuk || !bolehJalan() || !cadangan.length) return;
+            sibuk = true;
+            const baru = acak(cadangan).slice(0, Math.min(tampil.length, cadangan.length));
+            await Promise.all(baru.map(muatGambar));
+
+            if (bolehJalan()) {
+                const lama = tampil.slice(0, baru.length);
+                baru.forEach((liBaru, i) => {
+                    setTimeout(() => {
+                        lama[i].classList.add("is-keluar");
+                        setTimeout(() => {
+                            liBaru.classList.remove("is-keluar");
+                            liBaru.classList.add("is-masuk");
+                            grid.replaceChild(liBaru, lama[i]);
+                            requestAnimationFrame(() =>
+                                requestAnimationFrame(() => liBaru.classList.remove("is-masuk")),
+                            );
+                        }, 320);
+                    }, i * 110); // bergeser satu per satu, kiri ke kanan
+                });
+                cadangan = cadangan.filter((li) => !baru.includes(li)).concat(lama);
+                tampil = baru.concat(tampil.slice(baru.length));
+            }
+            sibuk = false;
+        };
+
+        const mulai = () => {
+            clearInterval(timer);
+            timer = setInterval(ganti, JEDA);
+        };
+
+        // Hanya berputar saat baris tampil di layar
+        new IntersectionObserver(
+            ([entri]) => {
+                terlihat = entri.isIntersecting;
+            },
+            { threshold: 0.35 },
+        ).observe(grid);
+
+        ["mouseenter", "focusin"].forEach((ev) => rail.addEventListener(ev, () => (disentuh = true)));
+        rail.addEventListener("mouseleave", () => (disentuh = false));
+        rail.addEventListener("focusout", (e) => {
+            if (!rail.contains(e.relatedTarget)) disentuh = false;
+        });
+
+        tombol?.addEventListener("click", () => {
+            dijeda = !dijeda;
+            tombol.setAttribute("aria-pressed", String(dijeda));
+            tombol.setAttribute(
+                "aria-label",
+                (dijeda ? "Lanjutkan" : "Jeda") + tombol.getAttribute("aria-label").replace(/^(Jeda|Lanjutkan)/, ""),
+            );
+        });
+
+        // Baris tidak berganti serentak
+        setTimeout(mulai, Number(grid.dataset.rotasiJedaAwal || 0));
+    });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+    initRotasiProduk();
     initGallery();
     initShare();
     initSlider();

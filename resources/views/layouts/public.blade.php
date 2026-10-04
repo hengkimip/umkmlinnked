@@ -1,7 +1,7 @@
 {{-- resources/views/layouts/public.blade.php --}}
 @php
     $menu = [
-        ['route' => 'direktori.index', 'active' => ['direktori.*', 'home'], 'label' => 'Semua Brand'],
+        ['route' => 'direktori.index', 'active' => ['direktori.*'],         'label' => 'Semua Brand'],
         ['route' => 'godigital.index', 'active' => ['godigital.*'],         'label' => 'Go Digital'],
         ['route' => 'goglobal.index',  'active' => ['goglobal.*'],          'label' => 'Go Global'],
         ['route' => 'tentang.index',   'active' => ['tentang.*'],           'label' => 'Tentang Kami'],
@@ -27,7 +27,7 @@
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
 
     @vite([
-        'resources/css/app.css',
+        'resources/css/publik.css',
         'resources/css/umkm-card.css',
         'resources/css/direktori-layout.css',
         'resources/js/direktori.js',
@@ -39,7 +39,13 @@
 
 <header class="ib-nav">
     <div class="ib-wrap ib-nav__inner">
-        <a href="{{ route('home') }}" class="ib-nav__logo" aria-label="UMKMLinked.ID — beranda">UMKMLinked<span>.ID</span></a>
+        <a href="{{ route('home') }}" class="ib-nav__logo" aria-label="UMKMLinked — ke beranda"
+           @if (request()->routeIs('home')) aria-current="page" @endif>
+            <picture>
+                <source srcset="{{ asset('logo-umkmlinked.webp') }}" type="image/webp">
+                <img src="{{ asset('logo-umkmlinked.png') }}" alt="UMKMLinked" width="480" height="147" class="ib-nav__logo-img">
+            </picture>
+        </a>
 
         <nav aria-label="Menu utama">
             <ul class="ib-nav__menu" id="nav-menu">

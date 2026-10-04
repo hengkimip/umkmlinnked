@@ -28,17 +28,29 @@
 @endphp
 
 @section('content')
-    <div class="mb-6">
-        <p class="text-sm text-slate-500">
-            Selamat datang, <span class="font-semibold text-slate-800">{{ $user->name }}</span>.
-            @if ($user->isSuperAdmin())
-                Anda melihat data seluruh OPD.
-            @elseif ($user->opd)
-                Data yang ditampilkan khusus UMKM binaan <span class="font-semibold text-slate-800">{{ $user->opd->nama_opd }}</span>.
-            @else
-                <span class="font-medium text-red-600">Akun Anda belum terhubung ke OPD — hubungi Super Admin.</span>
-            @endif
-        </p>
+    {{-- Banner sambutan: motif & siluet Kalbar seperti panel biru halaman lain --}}
+    <div class="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-navy-900 to-navy-950 px-5 py-7 text-white sm:px-8 sm:py-9">
+        <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-gold-500/15 blur-2xl" aria-hidden="true"></div>
+        <div class="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" aria-hidden="true"></div>
+        <div class="kalbar-motif" aria-hidden="true"></div>
+        <div class="kalbar-skyline" aria-hidden="true"></div>
+
+        <div class="relative max-w-2xl">
+            <span class="inline-flex items-center gap-2 rounded-full border border-gold-400/50 bg-gold-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-gold-400">
+                <span class="h-1.5 w-1.5 rotate-45 bg-gold-400"></span>
+                {{ $user->roleLabel() }}
+            </span>
+            <h2 class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Selamat datang, {{ $user->name }}</h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">
+                @if ($user->isSuperAdmin())
+                    Anda melihat data seluruh OPD.
+                @elseif ($user->opd)
+                    Data yang ditampilkan khusus UMKM binaan <span class="font-semibold text-white">{{ $user->opd->nama_opd }}</span>.
+                @else
+                    <span class="font-medium text-red-300">Akun Anda belum terhubung ke OPD — hubungi Super Admin.</span>
+                @endif
+            </p>
+        </div>
     </div>
 
     {{-- Statistik --}}
@@ -56,10 +68,13 @@
         <h2 class="mb-4 font-semibold text-slate-900">Aksi Cepat</h2>
         <div class="flex flex-wrap gap-3">
             @if ($user->isSuperAdmin())
-                <a href="{{ route('admin.peta-interaktif') }}" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900">
+                <a href="{{ route('superadmin.peta-interaktif') }}" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900">
                     Buka Peta Interaktif
                 </a>
             @endif
+            <a href="{{ route('admin.profil-umkm.index') }}" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900">
+                Kelola Profil UMKM
+            </a>
             <a href="{{ route('admin.import.index') }}" class="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-800">
                 Import Data Excel/CSV
             </a>

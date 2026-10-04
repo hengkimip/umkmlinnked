@@ -20,7 +20,7 @@
                 <legend class="ib-section-title">Jangkauan pasar</legend>
                 @foreach ($jangkauanList as $key => $label)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="jangkauan" data-filter-value="{{ $key }}" @checked(request('jangkauan') === $key)>
+                        <input type="checkbox" data-filter-key="jangkauan" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('jangkauan') === $key)>
                         <span>{{ $label }}</span>
                     </label>
                 @endforeach
@@ -32,7 +32,7 @@
                 <legend class="ib-section-title">Sertifikasi produk</legend>
                 @foreach ($sertifikasiList as $key => $label)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="sertifikasi" data-filter-value="{{ $key }}" @checked(request('sertifikasi') === $key)>
+                        <input type="checkbox" data-filter-key="sertifikasi" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('sertifikasi') === $key)>
                         <span>{{ $label }}</span>
                     </label>
                 @endforeach
@@ -44,7 +44,7 @@
                 <legend class="ib-section-title">Sektor usaha</legend>
                 @foreach ($kategoriList as $key => $s)
                     <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(request('sektor') === $key)>
+                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('sektor') === $key)>
                         <span>{{ $s['label'] }}</span>
                         <small>{{ $s['count'] }}</small>
                     </label>

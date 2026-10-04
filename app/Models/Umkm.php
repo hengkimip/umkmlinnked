@@ -26,6 +26,24 @@ class Umkm extends Model
 
     public const KABUPATEN_KOSONG = 'Tidak Diketahui';
 
+    // 14 kabupaten/kota Kalbar; urutan = prioritas pencocokan alamat (tebakKabupaten)
+    public const KABUPATEN_LENGKAP = [
+        'Pontianak'    => 'Kota Pontianak',
+        'Singkawang'   => 'Kota Singkawang',
+        'Sambas'       => 'Kab. Sambas',
+        'Bengkayang'   => 'Kab. Bengkayang',
+        'Landak'       => 'Kab. Landak',
+        'Mempawah'     => 'Kab. Mempawah',
+        'Sanggau'      => 'Kab. Sanggau',
+        'Sekadau'      => 'Kab. Sekadau',
+        'Sintang'      => 'Kab. Sintang',
+        'Melawi'       => 'Kab. Melawi',
+        'Kapuas Hulu'  => 'Kab. Kapuas Hulu',
+        'Ketapang'     => 'Kab. Ketapang',
+        'Kayong Utara' => 'Kab. Kayong Utara',
+        'Kubu Raya'    => 'Kab. Kubu Raya',
+    ];
+
     protected $table = 'umkm';
     
     protected $fillable = [
@@ -102,10 +120,87 @@ class Umkm extends Model
         return $this->hasMany(Pembiayaan::class);
     }
 
+    public function profil()
+    {
+        return $this->hasOne(ProfilUmkm::class);
+    }
+
+    /**
+     * Muat UMKM berdasarkan daftar ID dengan urutan yang sama (cache hanya menyimpan ID,
+     * karena objek tidak boleh di-unserialize dari cache — config cache.serializable_classes).
+     */
+    public static function muatUrut(array $ids, array $with = []): \Illuminate\Database\Eloquent\Collection
+    {
+        $model = static::with($with)->findMany($ids)->keyBy('id');
+
+        return (new \Illuminate\Database\Eloquent\Collection($ids))
+            ->map(fn ($id) => $model->get($id))
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Produk unggulan (foto utama); bila tidak ada, produk pertama.
+     */
+    public function produkUtama(): ?Produk
+    {
+        return $this->produk()->orderByDesc('is_unggulan')->orderBy('urutan')->orderBy('id')->first();
+    }
+
+    /**
+     * Tebak kabupaten/kota Kalbar dari teks alamat (dipakai import & edit profil).
+     */
+    public static function tebakKabupaten(string $alamat): ?string
+    {
+        foreach (array_keys(self::KABUPATEN_LENGKAP) as $kab) {
+            if (stripos($alamat, $kab) !== false) return $kab;
+        }
+        return null;
+    }
+
     // ==================== SCOPES ====================
     public function scopeAktif($query)
     {
         return $query->where('status', 'aktif');
+    }
+
+    /**
+     * UMKM yang sudah memakai kanal digital (marketplace, media sosial, WhatsApp).
+     */
+    public function scopeGoDigital($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNotNull('tokopedia')
+              ->orWhereNotNull('shopee')
+              ->orWhereNotNull('instagram')
+              ->orWhereNotNull('whatsapp')
+              ->orWhereHas('pemasaran', fn ($p) => $p->whereNotNull('platform_online')
+                  ->where('platform_online', '!=', '[]')
+                  ->where('platform_online', '!=', 'null'));
+        });
+    }
+
+    /**
+     * UMKM berjangkauan regional/nasional/ekspor atau bersertifikat Halal/BPOM/SNI.
+     */
+    public function scopeGoGlobal($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereHas('pemasaran', fn ($p) => $p->whereIn('jangkauan_pasar', ['ekspor', 'nasional', 'regional']))
+              ->orWhereHas('legalitas', fn ($l) => $l->where(fn ($s) => $s->whereNotNull('nomor_halal')
+                  ->orWhereNotNull('nomor_bpom')
+                  ->orWhereNotNull('nomor_sni')));
+        });
+    }
+
+    /**
+     * Dahulukan UMKM yang punya foto produk (unggahan atau tautan).
+     */
+    public function scopeFotoDulu($query)
+    {
+        return $query->withExists(['produk as punya_foto' => fn ($p) => $p->where('is_active', true)
+                ->where(fn ($f) => $f->whereNotNull('foto')->orWhereNotNull('foto_url'))])
+            ->orderByDesc('punya_foto');
     }
 
     public function scopeByKabupaten($query, $kabupaten)
@@ -354,24 +449,7 @@ class Umkm extends Model
      */
     private function namaKabupatenLengkap(string $kab): string
     {
-        $map = [
-            'Pontianak'    => 'Kota Pontianak',
-            'Singkawang'   => 'Kota Singkawang',
-            'Sambas'       => 'Kab. Sambas',
-            'Mempawah'     => 'Kab. Mempawah',
-            'Kubu Raya'    => 'Kab. Kubu Raya',
-            'Bengkayang'   => 'Kab. Bengkayang',
-            'Landak'       => 'Kab. Landak',
-            'Sanggau'      => 'Kab. Sanggau',
-            'Sekadau'      => 'Kab. Sekadau',
-            'Sintang'      => 'Kab. Sintang',
-            'Melawi'       => 'Kab. Melawi',
-            'Kapuas Hulu'  => 'Kab. Kapuas Hulu',
-            'Kayong Utara' => 'Kab. Kayong Utara',
-            'Ketapang'     => 'Kab. Ketapang',
-        ];
-
-        return $map[$kab] ?? $kab;
+        return self::KABUPATEN_LENGKAP[$kab] ?? $kab;
     }
 
     // ==================== LOGGING ====================

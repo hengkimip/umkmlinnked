@@ -5,11 +5,10 @@
 @props(['action', 'placeholder' => 'Cari UMKM atau produk...', 'kabupatenList' => collect()])
 
 @php
-    // Pertahankan filter aktif saat mencari — hanya parameter yang dikenal & bernilai skalar
-    $kunciFilter = ['sektor', 'kabupaten', 'klasifikasi', 'platform', 'jangkauan', 'sertifikasi', 'harga_min', 'harga_max'];
-    $filterAktif = collect(request()->only($kunciFilter))
-        ->filter(fn ($v) => is_scalar($v) && $v !== '')
-        ->map(fn ($v) => mb_substr((string) $v, 0, 100));
+    // Pertahankan filter aktif saat mencari — hanya nilai yang lolos whitelist FilterUmkm
+    $filterAktif = collect(\App\Support\FilterUmkm::dari(request()))
+        ->except('q')
+        ->map(fn ($v) => (string) $v);
 
     $kosong       = \App\Models\Umkm::KABUPATEN_KOSONG;
     $kabupatenUrut = collect($kabupatenList)->reject(fn ($k) => $k === $kosong)->values();
@@ -19,7 +18,7 @@
 <aside class="ib-sidebar" aria-label="Filter pencarian">
     <button type="button" class="ib-mobile-filter-toggle" id="mobile-filter-toggle"
             aria-expanded="false" aria-controls="sidebar-panel">
-        <span>Filter pencarian @if ($filterAktif->isNotEmpty() || request()->filled('q'))<small>· {{ $filterAktif->count() + (request()->filled('q') ? 1 : 0) }} aktif</small>@endif</span>
+        <span>Filter pencarian @if ($filterAktif->isNotEmpty() || (\App\Support\FilterUmkm::nilai('q') !== null))<small>· {{ $filterAktif->count() + ((\App\Support\FilterUmkm::nilai('q') !== null) ? 1 : 0) }} aktif</small>@endif</span>
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg>
     </button>
 
@@ -38,7 +37,7 @@
             @endforeach
             <div class="ib-search">
                 <label for="filter-q" class="ib-sr-only">Kata kunci</label>
-                <input type="search" id="filter-q" name="q" value="{{ request('q') }}"
+                <input type="search" id="filter-q" name="q" value="{{ \App\Support\FilterUmkm::nilai('q') }}"
                        placeholder="{{ $placeholder }}" maxlength="100" autocomplete="off">
                 <button type="submit" aria-label="Cari">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.2-5.2M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z"/></svg>
@@ -53,7 +52,7 @@
             @foreach (['unggulan' => 'Unggulan', 'berkembang' => 'Berkembang', 'dasar' => 'Dasar'] as $val => $lbl)
                 <label class="ib-checkbox">
                     <input type="radio" name="klas_r" data-filter-key="klasifikasi" data-filter-value="{{ $val }}"
-                           @checked(request('klasifikasi') === $val)>
+                           @checked(\App\Support\FilterUmkm::nilai('klasifikasi') === $val)>
                     <span>{{ $lbl }}</span>
                 </label>
             @endforeach
@@ -65,10 +64,10 @@
         <select id="filter-kabupaten" data-filter-select="kabupaten" class="ib-select">
             <option value="">Semua wilayah</option>
             @foreach ($kabupatenUrut as $kab)
-                <option value="{{ $kab }}" @selected(request('kabupaten') === $kab)>{{ $kab }}</option>
+                <option value="{{ $kab }}" @selected(\App\Support\FilterUmkm::nilai('kabupaten') === $kab)>{{ $kab }}</option>
             @endforeach
             @if ($adaKosong)
-                <option value="{{ $kosong }}" @selected(request('kabupaten') === $kosong)>Wilayah belum terdata</option>
+                <option value="{{ $kosong }}" @selected(\App\Support\FilterUmkm::nilai('kabupaten') === $kosong)>Wilayah belum terdata</option>
             @endif
         </select>
     </div>

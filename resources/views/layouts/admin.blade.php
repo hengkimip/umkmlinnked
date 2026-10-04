@@ -4,12 +4,16 @@
 
     $menu = array_filter([
         $authUser->isSuperAdmin() ? [
-            'route' => 'admin.peta-interaktif', 'match' => 'admin.peta-interaktif*', 'label' => 'Peta Interaktif',
+            'route' => 'superadmin.peta-interaktif', 'match' => 'superadmin.peta-interaktif*', 'label' => 'Peta Interaktif',
             'icon'  => 'M9 6.75V15m6-6v8.25m.5 3.75 4.88-2.44A1 1 0 0 0 21 18.4V4.62a1 1 0 0 0-1.38-.93l-4.12 2.06a1 1 0 0 1-.9 0L9.4 3.2a1 1 0 0 0-.9 0L3.62 5.64A1 1 0 0 0 3 6.53V20.4a1 1 0 0 0 1.38.93l4.12-2.06a1 1 0 0 1 .9 0l5.2 2.6a1 1 0 0 0 .9 0Z',
         ] : null,
         [
             'route' => 'admin.dashboard', 'match' => 'admin.dashboard', 'label' => 'Dashboard',
             'icon'  => 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6Zm0 9.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6Zm0 9.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z',
+        ],
+        [
+            'route' => 'admin.profil-umkm.index', 'match' => 'admin.profil-umkm.*', 'label' => 'Kelola Profil UMKM',
+            'icon'  => 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z',
         ],
         [
             'route' => 'admin.import.index', 'match' => 'admin.import.*', 'label' => 'Import Data',
@@ -41,8 +45,13 @@
 
 {{-- ==================== SIDEBAR ==================== --}}
 <aside :class="nav && '!translate-x-0'"
-       class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-navy-900 text-white transition-transform duration-200 lg:translate-x-0">
-    <div class="flex h-16 items-center justify-between border-b border-white/10 px-5">
+       class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col overflow-hidden bg-gradient-to-b from-navy-900 to-navy-950 text-white transition-transform duration-200 lg:translate-x-0">
+    {{-- Motif belah ketupat & siluet Kalbar, sama dengan panel biru halaman login --}}
+    <div class="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-gold-500/10 blur-2xl" aria-hidden="true"></div>
+    <div class="kalbar-motif" aria-hidden="true"></div>
+    <div class="kalbar-skyline" aria-hidden="true"></div>
+
+    <div class="relative flex h-16 items-center justify-between border-b border-white/10 px-5">
         <a href="{{ route('admin.dashboard') }}" class="text-lg font-extrabold tracking-tight">
             UMKMLinked<span class="text-gold-400">.ID</span>
         </a>
@@ -51,7 +60,7 @@
         </button>
     </div>
 
-    <nav class="flex-1 space-y-1 overflow-y-auto p-3 text-sm" aria-label="Menu admin">
+    <nav class="relative flex-1 space-y-1 overflow-y-auto p-3 text-sm" aria-label="Menu admin">
         <p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Menu</p>
         @foreach ($menu as $item)
             @php $aktif = request()->routeIs($item['match']); @endphp
@@ -79,7 +88,7 @@
         </a>
     </nav>
 
-    <div class="border-t border-white/10 p-4">
+    <div class="relative border-t border-white/10 bg-navy-950/40 p-4 backdrop-blur-sm">
         <div class="mb-3 flex items-center gap-3">
             <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gold-500 text-sm font-bold text-navy-950">
                 {{ strtoupper(mb_substr($authUser->name, 0, 1)) }}

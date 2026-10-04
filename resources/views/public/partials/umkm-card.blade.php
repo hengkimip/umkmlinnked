@@ -10,7 +10,7 @@
     $showKlasifikasi = $showKlasifikasi ?? true;
 
     $produk = $item->produkUnggulan->first() ?? $item->produk->first();
-    $foto   = $produk?->foto_final ?: ($item->foto_usaha ? Storage::url($item->foto_usaha) : null);
+    $foto   = $produk?->foto_kecil ?: ($item->foto_usaha ? Storage::url($item->foto_usaha) : null);
 
     $inisial = collect(preg_split('/\s+/', trim($item->nama_usaha)))
         ->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');

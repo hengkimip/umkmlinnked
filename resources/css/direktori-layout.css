@@ -171,6 +171,27 @@
 .ib-nav__logo span {
     color: var(--gold-500);
 }
+/* Logo gambar (sama dengan peta interaktif) */
+.ib-nav__logo {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: 8px;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.ib-nav__logo:hover {
+    opacity: 0.88;
+}
+.ib-nav__logo-img {
+    display: block;
+    width: auto;
+    height: 42px;
+}
+@media (max-width: 720px) {
+    .ib-nav__logo-img {
+        height: 34px;
+    }
+}
 .ib-nav__menu {
     display: flex;
     align-items: center;
@@ -1572,6 +1593,50 @@ a.ib-page-btn:hover {
     color: var(--accent);
     font-size: var(--fs-h3);
 }
+.ib-gallery__desc {
+    margin: 6px 0 0;
+    max-width: 60ch;
+    font-size: var(--fs-14);
+    line-height: 1.55;
+    color: var(--muted);
+    white-space: pre-line;
+}
+.ib-gallery__admin {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 20px 12px;
+}
+.ib-gallery__admin .ib-btn {
+    height: 36px;
+    font-size: var(--fs-14);
+}
+
+/* Badge produk (status/promosi) */
+.ib-badge {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font: 700 var(--fs-12) / 1.5 var(--font);
+    letter-spacing: 0.02em;
+    background: #eef2f7;
+    color: #334155;
+}
+.ib-badge[hidden] {
+    display: none;
+}
+.ib-badge--unggulan    { background: #fef3c7; color: #92400e; }
+.ib-badge--terbaru     { background: #e0f2fe; color: #075985; }
+.ib-badge--promo       { background: #fee2e2; color: #b91c1c; }
+.ib-badge--terlaris    { background: #dcfce7; color: #166534; }
+.ib-badge--rekomendasi { background: #ede9fe; color: #5b21b6; }
+.ib-badge--float {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    margin: 0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+}
 .ib-thumbs {
     display: flex;
     gap: 10px;
@@ -1681,6 +1746,17 @@ a.ib-page-btn:hover {
     font-weight: 600;
     line-height: 1.35;
     color: var(--ink);
+}
+.ib-product__desc {
+    margin: 0 0 10px;
+    font-size: var(--fs-14);
+    line-height: 1.5;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 .ib-product__price {
     margin: 0 0 10px;

@@ -10,7 +10,11 @@
     $fotoUtama = $amanUrl($utama?->foto_final) ?? $amanUrl($umkm->foto_usaha ? Storage::url($umkm->foto_usaha) : null);
 
     $galeri = $produkList
-        ->map(fn ($p) => ['src' => $amanUrl($p->foto_final), 'nama' => $p->nama_produk, 'harga' => $p->harga, 'wa' => $umkm->waPesanLink($p->nama_produk)])
+        ->map(fn ($p) => [
+            'src'   => $amanUrl($p->foto_final), 'kecil' => $amanUrl($p->foto_kecil), 'nama' => $p->nama_produk, 'harga' => $p->harga,
+            'desk'  => $p->deskripsi, 'badge' => $p->badge, 'label' => $p->badge_label,
+            'wa'    => $umkm->waPesanLink($p->nama_produk),
+        ])
         ->filter(fn ($g) => $g['src'])
         ->values();
 
@@ -136,6 +140,7 @@
                 @if ($utama)
                     <div class="ib-gallery__caption">
                         <div>
+                            <span class="ib-badge ib-badge--{{ $utama->badge }}" data-gallery-badge @if (! $utama->badge_label) hidden @endif>{{ $utama->badge_label }}</span>
                             <p class="ib-gallery__name" data-gallery-name>{{ $utama->nama_produk }}</p>
                             <p class="ib-gallery__price" data-gallery-price>
                                 @if ($utama->harga > 0)
@@ -144,6 +149,7 @@
                                     Harga dapat ditanyakan langsung ke penjual
                                 @endif
                             </p>
+                            <p class="ib-gallery__desc" data-gallery-desc @if (! $utama->deskripsi) hidden @endif>{{ $utama->deskripsi }}</p>
                         </div>
                         @if ($waUtama)
                             <a href="{{ $waUtama }}" class="ib-btn-wa" style="width:auto" target="_blank" rel="noopener noreferrer" data-gallery-wa>
@@ -154,6 +160,14 @@
                     </div>
                 @endif
 
+                @can('update', $umkm)
+                    <div class="ib-gallery__admin">
+                        <a href="{{ route('admin.produk.upload-foto', ['umkm' => $umkm->id]) }}" class="ib-btn ib-btn--ghost">
+                            Kelola foto &amp; data produk
+                        </a>
+                    </div>
+                @endcan
+
                 @if ($galeri->count() > 1)
                     <div class="ib-thumbs" role="group" aria-label="Pilih foto produk">
                         @foreach ($galeri as $i => $g)
@@ -161,8 +175,10 @@
                                     aria-label="Lihat {{ $g['nama'] }}"
                                     data-thumb-src="{{ $g['src'] }}" data-thumb-name="{{ $g['nama'] }}"
                                     data-thumb-price="{{ $g['harga'] > 0 ? $rp($g['harga']) : '' }}"
+                                    data-thumb-desc="{{ $g['desk'] }}"
+                                    data-thumb-badge="{{ $g['badge'] }}" data-thumb-badge-label="{{ $g['label'] }}"
                                     data-thumb-wa="{{ $g['wa'] }}">
-                                <img src="{{ $g['src'] }}" alt="" width="64" height="64" loading="lazy" referrerpolicy="no-referrer">
+                                <img src="{{ $g['kecil'] ?? $g['src'] }}" alt="" width="64" height="64" loading="lazy" referrerpolicy="no-referrer">
                             </button>
                         @endforeach
                     </div>
@@ -193,7 +209,7 @@
                     <h2 id="produk-title" class="ib-panel__title">Produk ({{ $produkList->count() }})</h2>
                     <div @class(["ib-products", "ib-products--single" => $produkList->count() === 1])>
                         @foreach ($produkList as $p)
-                            @php $pFoto = $amanUrl($p->foto_final); @endphp
+                            @php $pFoto = $amanUrl($p->foto_kecil); @endphp
                             <article class="ib-product">
                                 <div class="ib-product__photo">
                                     @if ($pFoto)
@@ -202,12 +218,18 @@
                                     @else
                                         <div class="ib-card__placeholder" aria-hidden="true">{{ $inisial ?: 'U' }}</div>
                                     @endif
+                                    @if ($p->badge_label)
+                                        <span class="ib-badge ib-badge--{{ $p->badge }} ib-badge--float">{{ $p->badge_label }}</span>
+                                    @endif
                                 </div>
                                 <div class="ib-product__body">
                                     <h3 class="ib-product__name">{{ $p->nama_produk }}</h3>
                                     <p class="ib-product__price">
                                         @if ($p->harga > 0) <strong>{{ $rp($p->harga) }}</strong> @else Tanya harga @endif
                                     </p>
+                                    @if ($p->deskripsi)
+                                        <p class="ib-product__desc">{{ $p->deskripsi }}</p>
+                                    @endif
                                     @if ($umkm->wa_link)
                                         <a href="{{ $umkm->waPesanLink($p->nama_produk) }}" class="ib-btn-wa" target="_blank" rel="noopener noreferrer"
                                            aria-label="Pesan {{ $p->nama_produk }} via WhatsApp">

@@ -19,13 +19,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
+        // Cek peran SEBELUM route model binding: pengguna tanpa hak mendapat 403 dan tidak bisa
+        // menebak ID mana yang ada (tanpa ini, ID yang tidak ada menghasilkan 404 lebih dulu).
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \Spatie\Permission\Middleware\RoleMiddleware::class,
+        );
+
+        // Header keamanan (nosniff, anti-clickjacking, HSTS di HTTPS, no-store untuk admin)
+        $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
+
         // Pengguna yang sudah login dan membuka /login diarahkan sesuai peran (FR-16)
         $middleware->redirectUsersTo(
             fn (Request $request) => $request->user()?->homeUrl() ?? '/'
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // fetch() di panel admin (Accept: application/json) menerima galat validasi 422 JSON, bukan redirect
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();

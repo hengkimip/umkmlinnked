@@ -3,6 +3,8 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Umkm;
+use App\Support\CacheData;
+use App\Support\FilterUmkm;
 use Illuminate\Http\Request;
 
 class GoGlobalController extends Controller
@@ -12,107 +14,73 @@ class GoGlobalController extends Controller
         // Kriteria Go Global: jangkauan ekspor/nasional ATAU punya sertifikasi internasional
         $query = Umkm::with(['legalitas', 'produkUnggulan', 'produk', 'pemasaran'])
             ->aktif()
-            ->where(function ($q) {
-                $q->whereHas('pemasaran', fn($p) =>
-                    $p->whereIn('jangkauan_pasar', ['ekspor', 'nasional', 'regional'])
-                )
-                ->orWhereHas('legalitas', fn($l) => $l->where(fn ($s) =>
-                    $s->whereNotNull('nomor_halal')
-                      ->orWhereNotNull('nomor_bpom')
-                      ->orWhereNotNull('nomor_sni')
-                ));
-            });
+            ->goGlobal();
 
         // Basis sebelum filter, untuk daftar sektor yang tersedia
         $basis = clone $query;
 
-        // Filter: Search
-        if ($request->filled('q')) {
-            $q = mb_substr(trim((string) $request->q), 0, 100);
-            $query->where(function ($sub) use ($q) {
-                $sub->where('nama_usaha', 'like', "%{$q}%")
-                    ->orWhere('sektor', 'like', "%{$q}%")
-                    ->orWhere('kabupaten', 'like', "%{$q}%")
-                    ->orWhereHas('produk', fn($p) =>
-                        $p->where('nama_produk', 'like', "%{$q}%")
-                    );
+        // Hanya parameter yang lolos whitelist yang dipakai (lihat FilterUmkm)
+        $f = FilterUmkm::dari($request);
+
+        if (isset($f['q'])) {
+            $pola = FilterUmkm::like($f['q']);
+            $query->where(function ($sub) use ($pola) {
+                $sub->where('nama_usaha', 'like', $pola)
+                    ->orWhere('sektor', 'like', $pola)
+                    ->orWhere('kabupaten', 'like', $pola)
+                    ->orWhereHas('produk', fn($p) => $p->where('nama_produk', 'like', $pola));
             });
         }
 
-        // Filter: Sektor
-        if ($request->filled('sektor')) {
-            $query->where('sektor', $request->sektor);
+        foreach (['sektor', 'kabupaten', 'klasifikasi'] as $kolom) {
+            if (isset($f[$kolom])) {
+                $query->where($kolom, $f[$kolom]);
+            }
         }
 
-        // Filter: Kabupaten
-        if ($request->filled('kabupaten')) {
-            $query->where('kabupaten', $request->kabupaten);
+        if (isset($f['jangkauan'])) {
+            $query->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', $f['jangkauan']));
         }
 
-        // Filter: Jangkauan pasar
-        if ($request->filled('jangkauan')) {
-            $query->whereHas('pemasaran', fn($p) =>
-                $p->where('jangkauan_pasar', $request->jangkauan)
-            );
-        }
-
-        // Filter: Sertifikasi
-        if ($request->filled('sertifikasi')) {
-            $sert = $request->sertifikasi;
-            $query->whereHas('legalitas', function ($l) use ($sert) {
-                match($sert) {
-                    'halal' => $l->whereNotNull('nomor_halal'),
-                    'bpom'  => $l->whereNotNull('nomor_bpom'),
-                    'pirt'  => $l->whereNotNull('nomor_pirt'),
-                    'sni'   => $l->whereNotNull('nomor_sni'),
-                    default => $l->whereNotNull('nomor_halal'),
-                };
-            });
-        }
-
-        // Filter: Klasifikasi
-        if ($request->filled('klasifikasi')) {
-            $query->where('klasifikasi', $request->klasifikasi);
+        // Kolom dipetakan dari nilai whitelist, bukan dari input mentah
+        if (isset($f['sertifikasi'])) {
+            $kolomSert = 'nomor_' . $f['sertifikasi'];
+            $query->whereHas('legalitas', fn ($l) => $l->whereNotNull($kolomSert));
         }
 
         $umkm = $query->orderByDesc('skor_total')
                       ->paginate(12)
                       ->withQueryString();
 
-        // Trending Go Global
-        $trending = Umkm::with(['produkUnggulan', 'produk', 'legalitas'])
-            ->aktif()
-            ->whereHas('pemasaran', fn($p) =>
-                $p->whereIn('jangkauan_pasar', ['ekspor', 'nasional'])
-            )
-            ->orderByDesc('skor_total')
-            ->limit(8)
-            ->get();
+        // Trending, daftar filter & statistik sama untuk semua pengunjung → di-cache
+        // Cache hanya berisi array/angka; model trending dimuat ulang dari ID-nya
+        ['trending' => $trendingId, 'kabupatenList' => $kabupatenList, 'kategoriList' => $kategoriList, 'jumlah' => $jumlah]
+            = CacheData::ingat('go-global:samping', 600, function () use ($basis) {
+                // Trending Go Global; bila tidak ada yang ekspor/nasional, ambil yang bersertifikat
+                $trending = Umkm::aktif()
+                    ->whereHas('pemasaran', fn($p) => $p->whereIn('jangkauan_pasar', ['ekspor', 'nasional']))
+                    ->orderByDesc('skor_total')->limit(8)->pluck('id')->all();
 
-        // Jika tidak ada yang ekspor/nasional, ambil yang punya sertifikasi
-        if ($trending->isEmpty()) {
-            $trending = Umkm::with(['produkUnggulan', 'legalitas'])
-                ->aktif()
-                ->whereHas('legalitas', fn($l) => $l->where(fn ($s) =>
-                    $s->whereNotNull('nomor_halal')
-                      ->orWhereNotNull('nomor_bpom')
-                ))
-                ->orderByDesc('skor_total')
-                ->limit(8)
-                ->get();
-        }
+                if (! $trending) {
+                    $trending = Umkm::aktif()
+                        ->whereHas('legalitas', fn($l) => $l->where(fn ($s) => $s->whereNotNull('nomor_halal')->orWhereNotNull('nomor_bpom')))
+                        ->orderByDesc('skor_total')->limit(8)->pluck('id')->all();
+                }
 
-        // Data sidebar
-        $kabupatenList = Umkm::aktif()
-            ->distinct()
-            ->orderBy('kabupaten')
-            ->pluck('kabupaten')
-            ->filter()
-            ->values();
-
-        // Kategori Go Global
-        // Hanya sektor yang benar-benar ada di cakupan Go Global
-        $kategoriList = Umkm::sektorTersedia($basis);
+                return [
+                    'trending' => $trending,
+                    'kabupatenList' => Umkm::aktif()->distinct()->orderBy('kabupaten')
+                        ->pluck('kabupaten')->filter()->values()->all(),
+                    // Hanya sektor yang benar-benar ada di cakupan Go Global
+                    'kategoriList' => Umkm::sektorTersedia(clone $basis),
+                    'jumlah' => [
+                        'ekspor'   => Umkm::aktif()->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', 'ekspor'))->count(),
+                        'nasional' => Umkm::aktif()->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', 'nasional'))->count(),
+                        'halal'    => Umkm::aktif()->whereHas('legalitas', fn($l) => $l->whereNotNull('nomor_halal'))->count(),
+                        'bpom'     => Umkm::aktif()->whereHas('legalitas', fn($l) => $l->whereNotNull('nomor_bpom'))->count(),
+                    ],
+                ];
+            });
 
         // Jangkauan pasar
         $jangkauanList = [
@@ -132,11 +100,13 @@ class GoGlobalController extends Controller
         // Statistik Go Global
         $stats = [
             ['value' => $umkm->total(), 'label' => 'UMKM Go Global', 'highlight' => true],
-            ['value' => Umkm::aktif()->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', 'ekspor'))->count(),   'label' => 'Ekspor'],
-            ['value' => Umkm::aktif()->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', 'nasional'))->count(), 'label' => 'Nasional'],
-            ['value' => Umkm::aktif()->whereHas('legalitas', fn($l) => $l->whereNotNull('nomor_halal'))->count(),          'label' => 'Bersertifikat Halal'],
-            ['value' => Umkm::aktif()->whereHas('legalitas', fn($l) => $l->whereNotNull('nomor_bpom'))->count(),           'label' => 'Terdaftar BPOM'],
+            ['value' => $jumlah['ekspor'],   'label' => 'Ekspor'],
+            ['value' => $jumlah['nasional'], 'label' => 'Nasional'],
+            ['value' => $jumlah['halal'],    'label' => 'Bersertifikat Halal'],
+            ['value' => $jumlah['bpom'],     'label' => 'Terdaftar BPOM'],
         ];
+
+        $trending = Umkm::muatUrut($trendingId, ['produkUnggulan', 'produk', 'legalitas']);
 
         return view('public.go-global', compact(
             'umkm', 'trending', 'kabupatenList',

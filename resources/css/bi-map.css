@@ -75,44 +75,137 @@ button {
     z-index: 700 !important;
 }
 
-/* ==================== CONNECTOR LINE STYLING ==================== */
-/* Garis connector harus di belakang label */
-.connector-line-custom {
-    stroke: #003066 !important;
-    stroke-width: 3 !important;
-    stroke-dasharray: 8, 6 !important;
-    opacity: 0.65 !important;
-    pointer-events: none !important;
-    z-index: 1 !important;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
+/* ==================== GARIS BATAS PROVINSI KALBAR ==================== */
+.leaflet-batasPane-pane {
+    z-index: 3 !important;
+}
+.kalbar-batas {
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+}
+/* Disorot sesaat saat tombol "Focus Kalbar" ditekan */
+.kalbar-batas.is-sorot {
+    animation: batasSorot 2.4s ease-out;
+}
+@keyframes batasSorot {
+    0%   { stroke: #d4a017; stroke-width: 6px; fill-opacity: 0.16; }
+    100% { stroke: #003066; stroke-width: 2.5px; fill-opacity: 0.05; }
 }
 
-/* Alternatif: Target semua polylines di overlay pane */
-.leaflet-overlay-pane path {
-    stroke: #003066 !important;
-    stroke-width: 3 !important;
-    stroke-dasharray: 8, 6 !important;
-    opacity: 0.65 !important;
-    pointer-events: none !important;
-}
-
-/* ==================== CIRCLE MARKER STYLING ==================== */
-.city-marker-custom {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-    z-index: 600 !important;
-}
-
-.city-marker-custom:hover {
-    filter: brightness(1.3) drop-shadow(0 4px 8px rgba(0, 48, 102, 0.3));
-}
-
-/* ==================== LABEL STYLING (PALING DEPAN) ==================== */
-.custom-label-icon {
+/* ==================== PENANDA KOTA ==================== */
+/* Satu penanda per kota: titik + garis + label, semua relatif ke koordinat kota
+   (posisi piksel tetap → ikut animasi zoom tanpa "mantul") */
+.kota-icon {
     background: none !important;
     border: none !important;
-    z-index: 700 !important;
+}
+.kota-icon.is-aktif {
+    z-index: 1000 !important;
+}
+.kota-icon.is-redup {
+    opacity: 0.35;
+}
+.kota-icon.is-kosong .kota__titik {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.kota {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.kota__titik {
+    position: absolute;
+    left: -9px;
+    top: -9px;
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid #003066;
+    border-radius: 50%;
+    background: rgba(212, 160, 23, 0.25); /* cincin: nama kota di peta dasar tetap terbaca */
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.kota__titik:hover,
+.kota-icon.is-aktif .kota__titik {
+    transform: scale(1.25);
+    background: rgba(212, 160, 23, 0.55);
+}
+
+.kota__garis {
+    position: absolute;
+    left: 0;
+    top: -1.25px;
+    height: 0;
+    border-top: 2.5px dashed rgba(0, 48, 102, 0.65);
+    transform-origin: 0 50%;
+    pointer-events: none;
+}
+
+.kota__label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+}
+
+/* Gelembung angka (mode ringkas) */
+.kota__ringkas {
+    position: absolute;
+    left: 6px;
+    top: -26px;
+    min-width: 24px;
+    padding: 2px 7px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #003066;
+    color: #fff;
+    font: 800 11px/1.3 "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+}
+
+/* Mode tampilan (diatur bi-map.js sesuai zoom & tabrakan label).
+   Disembunyikan dengan visibility agar ukuran label tetap bisa diukur. */
+.kota__garis,
+.kota__label,
+.kota__ringkas {
+    transition: opacity 0.2s ease, visibility 0.2s;
+}
+.kota-icon:not([data-mode="lengkap"]) .kota__garis,
+.kota-icon:not([data-mode="lengkap"]) .kota__label,
+.kota-icon:not([data-mode="ringkas"]) .kota__ringkas {
+    visibility: hidden;
+    opacity: 0;
+}
+.kota-icon[data-mode="sembunyi"] {
+    display: none;
+}
+
+/* Label provinsi (zoom jauh / tampilan Indonesia) */
+.provinsi-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 14px;
+    border: 2.5px solid #003066;
+    border-radius: 10px;
+    background: #fff;
+    color: #003066;
+    font: 800 12px/1.3 "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.provinsi-label span {
+    font-size: 10px;
+    color: #16a34a;
+}
+.provinsi-label:hover {
+    transform: translate(-50%, -50%) scale(1.06);
 }
 
 .city-label {
@@ -201,22 +294,12 @@ button {
 }
 
 /* ==================== ENSURE PROPER LAYERING ==================== */
-/* Pastikan label tidak tertutup oleh elemen lain */
-.leaflet-marker-icon {
-    z-index: 700 !important;
-}
-
 .leaflet-popup {
     z-index: 700 !important;
 }
 
 .leaflet-tooltip {
     z-index: 750 !important;
-}
-
-/* ==================== DISABLE POINTER EVENTS ON CONNECTOR =====*/
-.leaflet-overlay-pane path {
-    pointer-events: none !important;
 }
 
 /* ==================== RESPONSIVE ==================== */
@@ -696,32 +779,134 @@ header button:active {
 }
 
 /* ==================== END ==================== */
-/* ==================== RADIAL EXPANSION ==================== */
+/* ==================== RADIAL EXPANSION (cabang UMKM per kota) ==================== */
 
-.radial-svg-overlay {
-    pointer-events: none !important;
-    z-index: 400;
+/* Pane cabang: di atas penanda kota (label kota yang diredupkan berada di bawahnya) */
+.leaflet-radialLabelPane-pane {
+    z-index: 710 !important;
+}
+
+/* Satu penanda per kota terpilih: SVG cabang + label, berpusat di koordinat kota */
+.radial-icon {
+    background: none !important;
+    border: none !important;
+}
+.radial {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+.radial__svg {
+    position: absolute; /* left/top = -jari-jari, diatur bi-map.js */
+    overflow: visible;
+    pointer-events: none;
 }
 
 .radial-branch {
     stroke: #003066 !important;
-    stroke-width: 2 !important;
-    stroke-dasharray: 5, 5 !important;
-    opacity: 0.6 !important;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    stroke-width: 1.5 !important;
+    stroke-dasharray: 4, 4 !important;
+    opacity: 0.7 !important;
+    animation: radialFade 0.25s ease both;
 }
 
-.radial-label {
-    font-size: 11px !important;
-    font-weight: 800 !important;
-    fill: #003066 !important;
-    text-anchor: middle !important;
-    dominant-baseline: middle !important;
-    pointer-events: none !important;
-    text-shadow:
-        0 0 3px white,
-        0 0 3px white;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+.radial-dot {
+    fill: #003066;
+    fill-opacity: 1;
+    stroke: #fff;
+    stroke-width: 1.5;
+}
+
+/* Label diputar searah cabang; titik pangkal label = ujung cabang (left/top dari bi-map.js) */
+.radial-leaf {
+    position: absolute;
+    padding-left: 7px;
+    white-space: nowrap;
+    transform-origin: 0 50%;
+    transform: translateY(-50%) rotate(var(--putar));
+    animation: radialFade 0.25s ease both;
+}
+/* Sisi kiri: ujung kanan label berada di ujung cabang, teks dibalik agar terbaca */
+.radial-leaf--kiri {
+    padding-left: 0;
+    padding-right: 7px;
+    transform-origin: 100% 50%;
+    transform: translate(-100%, -50%) rotate(var(--putar));
+}
+
+.radial-leaf__link {
+    display: inline-block;
+    pointer-events: auto;
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    font: 700 10px/1.4 "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+    transform-origin: 0 50%; /* membesar menjauh dari ujung cabang */
+    transition:
+        font-size 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+        padding 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+        background-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+.radial-leaf--kiri .radial-leaf__link {
+    transform-origin: 100% 50%;
+}
+.radial-leaf__link--unggulan   { color: #15803d; }
+.radial-leaf__link--berkembang { color: #1d4ed8; }
+.radial-leaf__link--dasar      { color: #475569; }
+.radial-leaf__link--lainnya    { color: #003066; border-style: dashed; }
+
+/* Sorot (hover / fokus keyboard): font membesar, efek pegas, latar navy + cahaya emas */
+.radial-leaf__link:hover,
+.radial-leaf__link:focus-visible,
+.is-sorot .radial-leaf__link {
+    font-size: 13.5px;
+    padding: 3px 11px;
+    transform: scale(1.06);
+    background: linear-gradient(135deg, #003066 0%, #0f4c94 100%);
+    color: #fff;
+    border-color: #d4a017;
+    outline: none;
+    box-shadow: 0 6px 18px rgba(0, 48, 102, 0.35), 0 0 0 3px rgba(212, 160, 23, 0.35);
+    animation: radialGlow 1.6s ease-in-out 0.3s infinite;
+}
+
+/* Label yang disorot selalu di atas label lain */
+.radial-leaf.is-sorot,
+.radial-leaf:hover {
+    z-index: 5;
+}
+
+/* Cabang & titik milik label yang disorot ikut menyala */
+.radial-branch.is-sorot {
+    stroke: #d4a017 !important;
+    stroke-width: 3 !important;
+    stroke-dasharray: none !important;
+    opacity: 1 !important;
+}
+.radial-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), fill 0.2s ease;
+}
+.radial-dot.is-sorot {
+    fill: #d4a017;
+    transform: scale(1.9);
+}
+
+@keyframes radialGlow {
+    0%, 100% { box-shadow: 0 6px 18px rgba(0, 48, 102, 0.35), 0 0 0 3px rgba(212, 160, 23, 0.35); }
+    50%      { box-shadow: 0 6px 18px rgba(0, 48, 102, 0.35), 0 0 0 6px rgba(212, 160, 23, 0.15); }
+}
+
+@keyframes radialFade {
+    from { opacity: 0; }
 }
 
 /* ==================== ANIMATIONS ==================== */
@@ -750,14 +935,14 @@ header button:active {
 
 /* ==================== CITY LABEL ACTIVE STATE ==================== */
 
-.city-label.active {
+.kota-icon.is-aktif .city-label {
     background: #003066;
     color: white;
     box-shadow: 0 8px 20px rgba(0, 48, 102, 0.4);
     border-color: #003066;
 }
 
-.city-label.active .city-label__count {
+.kota-icon.is-aktif .city-label__count {
     color: #bbf7d0;
 }
 

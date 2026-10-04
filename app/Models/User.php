@@ -72,7 +72,7 @@ class User extends Authenticatable
     public function homeUrl(): string
     {
         return $this->isSuperAdmin()
-            ? route('admin.peta-interaktif', absolute: false)
+            ? route('superadmin.peta-interaktif', absolute: false)
             : route('admin.dashboard', absolute: false);
     }
 }

@@ -3,6 +3,8 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Umkm;
+use App\Support\CacheData;
+use App\Support\FilterUmkm;
 use Illuminate\Http\Request;
 
 class UmkmController extends Controller
@@ -12,81 +14,68 @@ class UmkmController extends Controller
         $query = Umkm::with(['legalitas', 'produkUnggulan', 'produk'])
             ->aktif();
 
-        if ($request->filled('q')) {
-            $q = mb_substr(trim((string) $request->q), 0, 100);
-            $query->where(function ($sub) use ($q) {
-                $sub->where('nama_usaha', 'like', "%{$q}%")
-                    ->orWhere('sektor', 'like', "%{$q}%")
-                    ->orWhere('kabupaten', 'like', "%{$q}%")
-                    ->orWhereHas('produk', fn($p) =>
-                        $p->where('nama_produk', 'like', "%{$q}%")
-                    );
+        // Hanya parameter yang lolos whitelist yang dipakai (lihat FilterUmkm)
+        $f = FilterUmkm::dari($request);
+
+        if (isset($f['q'])) {
+            $pola = FilterUmkm::like($f['q']);
+            $query->where(function ($sub) use ($pola) {
+                $sub->where('nama_usaha', 'like', $pola)
+                    ->orWhere('sektor', 'like', $pola)
+                    ->orWhere('kabupaten', 'like', $pola)
+                    ->orWhereHas('produk', fn($p) => $p->where('nama_produk', 'like', $pola));
             });
         }
 
-        if ($request->filled('sektor')) {
-            $query->where('sektor', $request->sektor);
+        foreach (['sektor', 'kabupaten', 'klasifikasi'] as $kolom) {
+            if (isset($f[$kolom])) {
+                $query->where($kolom, $f[$kolom]);
+            }
         }
 
-        if ($request->filled('kabupaten')) {
-            $query->where('kabupaten', $request->kabupaten);
+        if (isset($f['harga_min'])) {
+            $query->whereHas('produk', fn($p) => $p->where('harga', '>=', $f['harga_min']));
         }
 
-        if ($request->filled('klasifikasi')) {
-            $query->where('klasifikasi', $request->klasifikasi);
-        }
-
-        if ($request->filled('harga_min')) {
-            $query->whereHas('produk', fn($p) =>
-                $p->where('harga', '>=', (int)$request->harga_min)
-            );
-        }
-
-        if ($request->filled('harga_max')) {
-            $query->whereHas('produk', fn($p) =>
-                $p->where('harga', '<=', (int)$request->harga_max)
-            );
+        if (isset($f['harga_max'])) {
+            $query->whereHas('produk', fn($p) => $p->where('harga', '<=', $f['harga_max']));
         }
 
         $umkm = $query->orderByDesc('skor_total')
                       ->paginate(12)
                       ->withQueryString();
 
-        // Trending — query langsung tanpa cache
-        $trending = Umkm::with(['produkUnggulan', 'produk'])
-            ->aktif()
-            ->orderByDesc('skor_total')
-            ->limit(8)
-            ->get();
+        // Trending, daftar filter & statistik sama untuk semua pengunjung → di-cache
+        // (dibatalkan otomatis saat data UMKM berubah, lihat CacheData)
+        // Cache hanya berisi array/angka; model trending dimuat ulang dari ID-nya
+        ['trending' => $trendingId, 'kabupatenList' => $kabupatenList, 'sektorList' => $sektorList, 'stats' => $stats]
+            = CacheData::ingat('semua-brand:samping', 600, function () {
+                $kosong = Umkm::KABUPATEN_KOSONG;
+                $agg = Umkm::aktif()->toBase()->selectRaw("
+                    count(*) as total,
+                    sum(case when klasifikasi = 'unggulan' then 1 else 0 end) as unggulan,
+                    sum(case when klasifikasi = 'berkembang' then 1 else 0 end) as berkembang,
+                    sum(case when instagram is not null then 1 else 0 end) as digital,
+                    count(distinct case when kabupaten <> ? then kabupaten end) as kabupaten
+                ", [$kosong])->first();
 
-        // Data filter sidebar — query langsung
-        $kabupatenList = Umkm::aktif()
-            ->distinct()
-            ->orderBy('kabupaten')
-            ->pluck('kabupaten')
-            ->filter()
-            ->values();
+                return [
+                    'trending' => Umkm::aktif()->orderByDesc('skor_total')->limit(8)->pluck('id')->all(),
+                    'kabupatenList' => Umkm::aktif()->distinct()->orderBy('kabupaten')
+                        ->pluck('kabupaten')->filter()->values()->all(),
+                    // Kategori sidebar: hanya sektor yang benar-benar ada datanya
+                    'sektorList' => Umkm::sektorTersedia(),
+                    'stats' => [
+                        ['value' => (int) $agg->total,      'label' => 'Total UMKM', 'highlight' => true],
+                        ['value' => (int) $agg->unggulan,   'label' => 'Unggulan'],
+                        ['value' => (int) $agg->berkembang, 'label' => 'Berkembang'],
+                        ['value' => (int) $agg->digital,    'label' => 'Go Digital'],
+                        ['value' => (int) $agg->kabupaten,  'label' => 'Kabupaten/Kota'],
+                    ],
+                ];
+            });
 
-        // Kategori sidebar: hanya sektor yang benar-benar ada datanya
-        $sektorList = Umkm::sektorTersedia();
-
-        // Statistik dalam satu query agregat
-        $kosong = Umkm::KABUPATEN_KOSONG;
-        $agg = Umkm::aktif()->toBase()->selectRaw("
-            count(*) as total,
-            sum(case when klasifikasi = 'unggulan' then 1 else 0 end) as unggulan,
-            sum(case when klasifikasi = 'berkembang' then 1 else 0 end) as berkembang,
-            sum(case when instagram is not null then 1 else 0 end) as digital,
-            count(distinct case when kabupaten <> ? then kabupaten end) as kabupaten
-        ", [$kosong])->first();
-
-        $stats = [
-            ['value' => (int) $agg->total,      'label' => 'Total UMKM', 'highlight' => true],
-            ['value' => (int) $agg->unggulan,   'label' => 'Unggulan'],
-            ['value' => (int) $agg->berkembang, 'label' => 'Berkembang'],
-            ['value' => (int) $agg->digital,    'label' => 'Go Digital'],
-            ['value' => (int) $agg->kabupaten,  'label' => 'Kabupaten/Kota'],
-        ];
+        $trending = Umkm::muatUrut($trendingId, ['produkUnggulan', 'produk']);
 
         return view('public.direktori', compact(
             'umkm', 'trending', 'kabupatenList', 'sektorList', 'stats'

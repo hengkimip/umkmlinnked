@@ -5,17 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="bi-data-url" content="{{ route('admin.peta-interaktif.data') }}">
+    <meta name="bi-data-url" content="{{ route('superadmin.peta-interaktif.data') }}">
+    <meta name="kalbar-geojson-url" content="{{ asset('geo/kalbar.geojson') }}">
     <title>Peta Interaktif UMKM - KPw BI Kalimantan Barat</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
     <style>body { font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; }</style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    @vite(['resources/css/bi-map.css', 'resources/js/bi-map.js'])
+    {{-- Leaflet: integritas berkas CDN dicek (SRI); skrip dimuat tanpa memblokir render --}}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    {{-- Tailwind hasil build (dulu Tailwind CDN yang menyusun CSS di browser) --}}
+    @vite(['resources/css/peta-tailwind.css', 'resources/css/bi-map.css', 'resources/js/bi-map.js'])
 </head>
 
 <body x-data="umkmApp()" @load="init()" x-cloak class="h-screen flex flex-col overflow-hidden bg-gray-50">
@@ -47,10 +54,12 @@
                     </template>
                 </select>
 
-                {{-- TIER DROPDOWN --}}
-                <select x-model="selectedTier" class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-white hover:border-slate-300 cursor-pointer min-w-max">
-                    <template x-for="tier in tiers" :key="tier.value">
-                        <option :value="tier.value" x-text="tier.label"></option>
+                {{-- KATEGORI UMKM (sektor dari database) --}}
+                <select x-model="selectedSektor" aria-label="Kategori UMKM"
+                        class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-white hover:border-slate-300 cursor-pointer min-w-max">
+                    <option value="">Semua Kategori</option>
+                    <template x-for="s in sektorList" :key="s.kode">
+                        <option :value="s.kode" x-text="s.label + ' (' + s.jumlah + ')'"></option>
                     </template>
                 </select>
 
@@ -123,6 +132,16 @@
                     <p class="text-xs text-slate-400 font-bold">Memuat data UMKM...</p>
                 </div>
 
+                <div x-show="!isLoading && loadError" x-cloak role="alert"
+                     class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700" x-text="loadError"></div>
+
+                <div x-show="!isLoading && tidakDiketahui > 0" x-cloak
+                     class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <p class="font-bold" x-text="tidakDiketahui + ' UMKM belum memiliki kabupaten/kota'"></p>
+                    <p class="mt-1">Tidak tampil pada label peta. Cantumkan nama kabupaten/kota pada alamat usaha di
+                        <a href="{{ route('admin.profil-umkm.index') }}" class="font-bold underline">Kelola Profil UMKM</a>.</p>
+                </div>
+
                 <template x-if="!isLoading">
                     <div>
                         {{-- ==================== TAB 1: DASHBOARD ==================== --}}
@@ -156,7 +175,7 @@
                                     {{-- CTA --}}
                                     <div class="bg-[#003066] text-white p-4 rounded-lg text-center">
                                         <p class="text-xs font-bold uppercase mb-2">Mulai Eksplorasi</p>
-                                        <p class="text-sm">Klik marker pada peta atau gunakan filter Wilayah untuk melihat data UMKM</p>
+                                        <p class="text-sm">Klik label kota/kabupaten pada peta untuk memunculkan cabang UMKM, lalu klik nama UMKM untuk detail &amp; rekomendasi program KPw BI.</p>
                                     </div>
 
                                     {{-- STATS --}}
@@ -207,19 +226,29 @@
                             <h2 class="text-lg font-black text-slate-900">Daftar UMKM</h2>
                             
                             {{-- FILTER INFO --}}
-                            <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                            <template x-if="selectedCity">
+                                {{-- Kota/kabupaten dipilih dari peta --}}
+                                <div class="rounded-xl bg-[#003066] p-4 text-white shadow-md">
+                                    <p class="text-[11px] font-bold uppercase tracking-wider text-blue-200">Kota / Kabupaten terpilih</p>
+                                    <p class="mt-0.5 text-lg font-black leading-tight" x-text="selectedCity.name"></p>
+                                    <p class="text-xs text-blue-200" x-text="'Ibu kota: ' + selectedCity.ibukota"></p>
+                                    <p class="mt-2 inline-block rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold"
+                                       x-text="filteredTable.length + ' UMKM dari database'"></p>
+                                </div>
+                            </template>
+                            <div x-show="!selectedCity" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
                                 <p class="text-xs text-blue-600 font-bold">📊 Filter Aktif:</p>
                                 <div class="text-sm font-black text-blue-900 mt-1">
-                                    <template x-if="!selectedKabupaten && !selectedTier">
+                                    <template x-if="!selectedKabupaten && !selectedSektor">
                                         <p>Menampilkan Semua UMKM</p>
                                     </template>
-                                    <template x-if="selectedKabupaten || selectedTier">
+                                    <template x-if="selectedKabupaten || selectedSektor">
                                         <div class="space-y-1">
                                             <template x-if="selectedKabupaten">
                                                 <p x-text="'Wilayah: ' + selectedKabupaten"></p>
                                             </template>
-                                            <template x-if="selectedTier">
-                                                <p x-text="'Tier: ' + selectedTier"></p>
+                                            <template x-if="selectedSektor">
+                                                <p x-text="'Kategori: ' + labelSektor"></p>
                                             </template>
                                         </div>
                                     </template>
@@ -245,58 +274,52 @@
                                 </template>
 
                                 <template x-for="(umkm, index) in filteredTable" :key="umkm.id">
-                                    <div class="bg-white border-2 border-slate-200 rounded-lg p-3 hover:shadow-md hover:border-blue-300 transition-all">
-                                        
-                                        {{-- NO, NAMA, & STATUS --}}
-                                        <div class="flex items-start gap-2 mb-2">
-                                            <span class="flex-shrink-0 w-6 h-6 bg-[#003066] text-white rounded-full flex items-center justify-center text-[10px] font-bold" x-text="(index + 1)"></span>
+                                    <div class="bg-white border-2 border-slate-200 rounded-xl p-3.5 hover:shadow-md hover:border-blue-300 transition-all">
+
+                                        {{-- NO, NAMA, & STATUS — nama UMKM dibuat menonjol --}}
+                                        <div class="flex items-start gap-2.5 mb-2">
+                                            <span class="flex-shrink-0 w-7 h-7 bg-[#003066] text-white rounded-full flex items-center justify-center text-xs font-bold" x-text="(index + 1)"></span>
                                             <div class="flex-1 min-w-0">
-                                                <p class="text-xs font-bold text-slate-900 line-clamp-2" x-text="umkm.nama"></p>
+                                                <a :href="umkm.url" target="_blank" rel="noopener"
+                                                   class="block break-words text-[15px] font-extrabold leading-snug text-[#003066] hover:text-blue-700 hover:underline"
+                                                   x-text="umkm.nama"></a>
+                                                <p class="mt-0.5 text-xs font-semibold text-slate-500">
+                                                    <span x-text="umkm.sektor"></span><span x-show="umkm.kecamatan" x-text="' · Kec. ' + umkm.kecamatan"></span>
+                                                </p>
                                             </div>
                                             <span :class="{
                                                 'bg-green-100 text-green-700': umkm.status === 'Unggulan',
                                                 'bg-blue-100 text-blue-700': umkm.status === 'Berkembang',
                                                 'bg-slate-100 text-slate-600': umkm.status === 'Dasar'
-                                            }" class="text-[8px] font-black px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap" x-text="umkm.status"></span>
+                                            }" class="text-[10px] font-black px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap" x-text="umkm.status"></span>
                                         </div>
 
-                                        {{-- LOKASI & SEKTOR --}}
-                                        <div class="space-y-1 text-[9px] text-slate-600 mb-2">
-                                            <template x-if="umkm.kecamatan">
-                                                <p><span class="font-bold">📍 Kec:</span> <span x-text="umkm.kecamatan"></span></p>
-                                            </template>
-                                            <p><span class="font-bold">🏢 Sektor:</span> <span x-text="umkm.sektor"></span></p>
-                                            <template x-if="umkm.sub_sektor">
-                                                <p><span class="font-bold">Sub:</span> <span x-text="umkm.sub_sektor"></span></p>
-                                            </template>
-                                        </div>
-
-                                        {{-- ALAMAT --}}
-                                        <template x-if="umkm.alamat">
-                                            <div class="bg-slate-50 p-2 rounded mb-2 border border-slate-100">
-                                                <p class="text-[8px] text-slate-700 font-bold mb-1">Alamat:</p>
-                                                <p class="text-[8px] text-slate-600 line-clamp-2" x-text="umkm.alamat"></p>
+                                        {{-- ALAMAT — dibuat menonjol --}}
+                                        <div class="mb-2.5 flex gap-2 rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2">
+                                            <svg class="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                                            <div class="min-w-0">
+                                                <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Alamat</p>
+                                                <p class="break-words text-[13px] font-semibold leading-snug text-slate-800"
+                                                   :class="!umkm.alamat && 'italic font-normal text-slate-400'"
+                                                   x-text="umkm.alamat || 'Belum diisi'"></p>
                                             </div>
-                                        </template>
+                                        </div>
 
                                         {{-- CONTACT INFO --}}
-                                        <div class="space-y-1 text-[8px] text-slate-600 mb-2 pb-2 border-b border-slate-100">
-                                            <template x-if="umkm.telepon">
-                                                <p><span class="font-bold">☎️</span> <a :href="'tel:' + umkm.telepon" class="text-blue-600 hover:underline" x-text="umkm.telepon"></a></p>
-                                            </template>
+                                        <div class="space-y-1 text-xs text-slate-600 mb-2.5 pb-2.5 border-b border-slate-100">
                                             <template x-if="umkm.whatsapp">
-                                                <p><span class="font-bold">💬</span> <a :href="'https://wa.me/' + umkm.whatsapp" target="_blank" class="text-green-600 hover:underline" x-text="umkm.whatsapp"></a></p>
+                                                <p><span class="font-bold">💬</span> <a :href="'https://wa.me/' + umkm.whatsapp" target="_blank" rel="noopener noreferrer" class="font-semibold text-green-700 hover:underline" x-text="umkm.whatsapp"></a></p>
                                             </template>
                                             <template x-if="umkm.email">
-                                                <p><span class="font-bold">✉️</span> <a :href="'mailto:' + umkm.email" class="text-blue-600 hover:underline text-[7px]" x-text="umkm.email"></a></p>
+                                                <p class="truncate"><span class="font-bold">✉️</span> <a :href="'mailto:' + umkm.email" class="text-blue-600 hover:underline" x-text="umkm.email"></a></p>
                                             </template>
                                             <template x-if="umkm.website">
-                                                <p><span class="font-bold">🌐</span> <a :href="umkm.website" target="_blank" class="text-blue-600 hover:underline text-[7px] line-clamp-1" x-text="umkm.website"></a></p>
+                                                <p class="truncate"><span class="font-bold">🌐</span> <a :href="umkm.website" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline" x-text="umkm.website"></a></p>
                                             </template>
                                         </div>
 
                                         {{-- STATS --}}
-                                        <div class="flex flex-wrap gap-2 text-[8px] font-bold">
+                                        <div class="flex flex-wrap gap-2 text-[11px] font-bold">
                                             <template x-if="umkm.tenaga_kerja">
                                                 <span class="bg-slate-100 text-slate-700 px-2 py-1 rounded" x-text="'👥 ' + umkm.tenaga_kerja + ' TK'"></span>
                                             </template>

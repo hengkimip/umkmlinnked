@@ -16,7 +16,7 @@ class UmkmCard extends Component
     ) {
         // Hitung foto sekali di sini, bukan berulang di setiap Blade
         $produkUtama = $item->produkUnggulan->first() ?? $item->produk->first();
-        $this->fotoTampil = $produkUtama?->foto_final;
+        $this->fotoTampil = $produkUtama?->foto_kecil;
 
         if (!$this->fotoTampil && $item->foto_usaha) {
             $this->fotoTampil = Storage::url($item->foto_usaha);

@@ -1,0 +1,6 @@
+/* Utilitas Tailwind halaman peta interaktif (dibangun saat build, bukan di browser) */
+@config "../../tailwind.peta.config.js";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

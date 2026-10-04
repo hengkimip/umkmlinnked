@@ -1,0 +1,425 @@
+/* ==========================================================================
+   BERANDA — etalase produk: Semua Brand · Go Digital · Go Global
+   Memakai token desain dari direktori-layout.css (warna, tipografi, motif).
+   ========================================================================== */
+.ib-home-hero .ib-hero__content {
+    padding-bottom: clamp(104px, 13vw, 168px);
+}
+.ib-home-hero .ib-hero__title {
+    max-width: 16ch;
+}
+
+/* Pencarian besar di hero */
+.ib-home-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 640px;
+    margin-top: 28px;
+    padding: 6px 6px 6px 18px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--muted);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+.ib-home-search input {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: 500 var(--fs-16) / 1 var(--font);
+}
+.ib-home-search input:focus {
+    outline: none;
+}
+.ib-home-search:focus-within {
+    box-shadow: 0 0 0 4px rgba(232, 185, 35, 0.55), 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+}
+.ib-home-search button {
+    height: 44px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--gold-400);
+    color: var(--navy-950);
+    font: 700 var(--fs-14) / 1 var(--font);
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.ib-home-search button:hover {
+    background: #f2c94c;
+}
+.ib-home-search button:active {
+    transform: scale(0.97);
+}
+
+/* Chip lompat ke kategori */
+.ib-home-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+.ib-home-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: var(--fs-14);
+    font-weight: 600;
+    text-decoration: none;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.ib-home-chip span {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    font-size: var(--fs-12);
+}
+.ib-home-chip:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+.ib-home-chip--navy .ib-icon { color: #bfdbfe; }
+.ib-home-chip--teal .ib-icon { color: #5eead4; }
+.ib-home-chip--gold .ib-icon { color: var(--gold-400); }
+
+/* ---------- Baris produk ---------- */
+.ib-rail {
+    --rail-accent: var(--navy-900);
+    --rail-tint: #e8eef8;
+    --gap: 16px;
+    padding: clamp(36px, 5vw, 56px) 0 8px;
+}
+.ib-rail--teal {
+    --rail-accent: var(--accent);
+    --rail-tint: #e0f2f1;
+}
+.ib-rail--gold {
+    --rail-accent: #a87c0c; /* emas gelap, 4.6:1 di atas putih */
+    --rail-tint: var(--gold-050);
+}
+.ib-rail:last-of-type {
+    padding-bottom: clamp(56px, 7vw, 88px);
+}
+
+.ib-rail__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-bottom: 20px;
+}
+.ib-rail__title-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    min-width: 0;
+    max-width: 680px;
+}
+.ib-rail__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--rail-tint);
+    color: var(--rail-accent);
+}
+.ib-rail__eyebrow {
+    margin: 0;
+    color: var(--rail-accent);
+    font-size: var(--fs-12);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.ib-rail__title {
+    margin: 2px 0 4px;
+    color: var(--ink);
+    font-size: var(--fs-h2);
+    font-weight: 700;
+    line-height: 1.2;
+}
+.ib-rail__sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-14);
+    line-height: 1.55;
+}
+.ib-rail__all {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 999px;
+    background: var(--rail-accent);
+    color: #fff;
+    font-size: var(--fs-14);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: filter 0.15s ease;
+}
+.ib-rail__all span {
+    font-weight: 500;
+    opacity: 0.8;
+}
+.ib-rail__all .ib-icon {
+    transition: transform 0.15s ease;
+}
+.ib-rail__all:hover {
+    filter: brightness(1.12);
+}
+.ib-rail__all:hover .ib-icon {
+    transform: translateX(2px);
+}
+.ib-rail__empty {
+    margin: 0;
+    padding: 28px;
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    text-align: center;
+}
+
+/* Empat produk berjejer per baris kategori; 2 × 2 di layar kecil */
+.ib-rail__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.ib-rail__item {
+    min-width: 0;
+    /* Pergantian acak: kartu lama bergeser keluar ke kiri, kartu baru masuk dari kanan */
+    transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ib-rail__item.is-keluar {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.98);
+}
+.ib-rail__item.is-masuk {
+    opacity: 0;
+    transform: translateX(28px) scale(0.98);
+    transition: none;
+}
+
+/* Tombol jeda pergantian (WCAG 2.2.2) */
+.ib-rail__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ib-rail__pause {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--rail-accent);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ib-rail__pause:hover {
+    border-color: var(--rail-accent);
+    background: var(--rail-tint);
+}
+.ib-rail__play-ikon,
+.ib-rail__pause[aria-pressed="true"] .ib-rail__pause-ikon {
+    display: none;
+}
+.ib-rail__pause[aria-pressed="true"] .ib-rail__play-ikon {
+    display: block;
+}
+
+/* ---------- Kartu produk ---------- */
+.ib-produk {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.ib-produk__foto {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: var(--rail-tint);
+}
+.ib-produk__foto img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Gradasi tipis agar lencana tetap terbaca di atas foto terang */
+.ib-produk__foto::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10, 31, 61, 0.28) 0%, transparent 32%);
+    pointer-events: none;
+}
+.ib-produk__placeholder {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(circle at 70% 20%, rgba(232, 185, 35, 0.22), transparent 55%),
+        linear-gradient(150deg, var(--navy-900), var(--navy-700));
+}
+.ib-produk__placeholder::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--motif) repeat;
+    background-size: 72px;
+    opacity: 0.16;
+}
+.ib-produk__placeholder span {
+    color: #fff;
+    font-size: 2.75rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    opacity: 0.9;
+}
+.ib-produk__lencana {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ib-produk__lencana span {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--rail-accent);
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(10, 31, 61, 0.18);
+}
+.ib-produk__info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px 16px;
+}
+.ib-produk__brand {
+    margin: 0;
+    overflow: hidden;
+    color: var(--rail-accent);
+    font-size: var(--fs-12);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.ib-produk__nama {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-16);
+    font-weight: 700;
+    line-height: 1.35;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.ib-produk__meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--fs-12);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ib-produk__meta .ib-icon {
+    flex-shrink: 0;
+}
+.ib-produk__harga {
+    margin: auto 0 0;
+    padding-top: 8px;
+    color: var(--accent);
+    font-size: var(--fs-16);
+    font-weight: 700;
+}
+
+@media (hover: hover) {
+    .ib-produk:hover {
+        transform: translateY(-6px);
+        border-color: color-mix(in srgb, var(--rail-accent) 30%, var(--line));
+        box-shadow: 0 22px 40px -22px rgba(10, 31, 61, 0.45);
+    }
+    .ib-produk:hover .ib-produk__foto img {
+        transform: scale(1.06);
+    }
+}
+.ib-produk:focus-visible {
+    outline: 3px solid var(--gold-400);
+    outline-offset: 3px;
+}
+
+@media (max-width: 960px) {
+    .ib-rail__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .ib-home-search button {
+        padding: 0 16px;
+    }
+    .ib-rail {
+        --gap: 12px;
+    }
+    .ib-rail__icon {
+        width: 40px;
+        height: 40px;
+    }
+    .ib-produk__info {
+        padding: 12px;
+    }
+}
