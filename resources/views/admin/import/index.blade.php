@@ -4,14 +4,28 @@
 @section('heading', 'Import Data UMKM')
 
 @section('content')
-<div class="mx-auto max-w-3xl">
+<div class="mx-auto max-w-3xl" x-data="{ tab: @js($errors->manual->any() || old('_form') === 'manual' ? 'manual' : 'file') }">
 
-    <p class="mb-6 text-sm text-slate-500">
-        Unggah file CSV atau Excel untuk mengimpor data UMKM secara massal.
+    <p class="mb-4 text-sm text-slate-500">
+        Impor banyak UMKM sekaligus dari file CSV/Excel, atau tambahkan satu UMKM secara manual.
         @if ($opd)
             Data akan tercatat sebagai binaan <span class="font-semibold text-slate-700">{{ $opd->nama_opd }}</span>.
         @endif
     </p>
+
+    {{-- Pilihan cara menambah data --}}
+    <div class="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-white p-1" role="tablist">
+        <button type="button" role="tab" @click="tab = 'file'" :aria-selected="tab === 'file'"
+                :class="tab === 'file' ? 'bg-navy-800 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'"
+                class="rounded-lg px-3 py-2.5 text-sm font-semibold transition">Import File (CSV/Excel)</button>
+        <button type="button" role="tab" @click="tab = 'manual'" :aria-selected="tab === 'manual'"
+                :class="tab === 'manual' ? 'bg-navy-800 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'"
+                class="rounded-lg px-3 py-2.5 text-sm font-semibold transition">Tambah Manual</button>
+    </div>
+
+    @include('admin.import._manual')
+
+    <div x-show="tab === 'file'" role="tabpanel">
 
     {{-- Laporan baris gagal (FR-15) --}}
     @if (session('import_errors'))
@@ -60,8 +74,10 @@
                     <li>Omzet per bulan: angka saja tanpa "Rp" atau titik, contoh <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">15000000</code>.</li>
                     <li>Legalitas: pisahkan dengan koma, contoh <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">NIB, NPWP, SIUP</code>.</li>
                     <li>
-                        Alamat usaha sebaiknya memuat nama kabupaten/kota agar wilayah terbaca otomatis
-                        (jika tidak, tercatat <em>"Tidak Diketahui"</em> dan perlu koreksi manual).
+                        Kolom <strong>kota_kabupaten</strong>: nama kota/kabupaten di Kalimantan Barat, contoh
+                        <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">Kota Pontianak</code> atau
+                        <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs">Kab. Sambas</code>.
+                        Jika kosong, wilayah dibaca dari alamat usaha (bila tidak terbaca, tercatat <em>"Tidak Diketahui"</em> dan perlu koreksi manual).
                     </li>
                     <li>
                         Kolom <strong>foto_produk</strong>: tautan Google Drive yang dibagikan sebagai
@@ -159,9 +175,15 @@
         <ul class="list-inside list-disc space-y-1">
             <li>Baris yang gagal tidak memengaruhi baris yang berhasil diimpor.</li>
             <li>Pemilik usaha dengan nomor WhatsApp yang sama tidak digandakan.</li>
+            <li>
+                Setiap baris dibandingkan dengan UMKM yang sudah terdaftar di kota/kabupaten yang sama (oleh OPD mana pun, termasuk Bank Indonesia):
+                nama pemilik, nama usaha, alamat, No. WhatsApp, dan e-mail. Baris dengan skor kemiripan ≥ {{ config('umkm.ambang_duplikat') }}
+                <strong>tidak langsung disimpan</strong>, melainkan masuk <a href="{{ route('admin.duplikat.index') }}" class="font-semibold text-navy-700 underline">Antrean Duplikat</a> untuk diputuskan admin.
+            </li>
             <li>Skor dan klasifikasi dihitung otomatis setelah import.</li>
             <li>File besar (&gt;500 baris) dapat memakan waktu 2–5 menit.</li>
         </ul>
+    </div>
     </div>
 </div>
 @endsection

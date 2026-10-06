@@ -388,11 +388,10 @@ main.expanded {
 
 .toggle-sidebar-btn {
     transition: all 0.3s ease;
-    position: fixed;
-    left: 320px;
+    position: fixed; /* posisi kiri diatur Alpine: tepi sidebar (left-80) / tepi layar (left-0) */
     top: 50%;
     transform: translateY(-50%);
-    z-index: 999;
+    z-index: 1003; /* di atas panel samping (1002) & kontrol Leaflet (1000) */
     background: white;
     border: 1px solid #e2e8f0;
     border-left: none;
@@ -422,15 +421,6 @@ main.expanded {
     width: 20px;
     height: 20px;
     transition: transform 0.3s ease;
-}
-
-aside.collapsed ~ .toggle-sidebar-btn {
-    left: 0;
-    border-radius: 0 8px 8px 0;
-}
-
-aside.collapsed ~ .toggle-sidebar-btn svg {
-    transform: rotate(180deg);
 }
 
 aside h2 {

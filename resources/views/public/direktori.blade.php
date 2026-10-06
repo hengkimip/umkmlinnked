@@ -16,18 +16,23 @@
     <div class="ib-container">
 
         <x-public.filter-panel :action="url()->current()" placeholder="Cari brand atau produk..." :kabupaten-list="$kabupatenList">
-            <fieldset class="ib-filter-group">
-                <legend class="ib-section-title">Sektor usaha</legend>
-                @foreach ($sektorList as $key => $s)
-                    <label class="ib-checkbox">
-                        <input type="checkbox" data-filter-key="sektor" data-filter-value="{{ $key }}" @checked(\App\Support\FilterUmkm::nilai('sektor') === $key)>
-                        <span>{{ $s['label'] }}</span>
-                        <small>{{ $s['count'] }}</small>
-                    </label>
-                @endforeach
-            </fieldset>
+            {{-- Sektor Usaha · Platform Digital · Jangkauan Pasar · Sertifikasi Produk
+                 (boleh mencentang beberapa pilihan; pilihan & jumlah sama dengan Peta Interaktif) --}}
+            @foreach ($filterTag as $grup => $def)
+                @php $dipilih = \App\Support\FilterUmkm::daftar($grup); @endphp
+                <fieldset class="ib-filter-group">
+                    <legend class="ib-section-title">{{ $def['judul'] }}</legend>
+                    @foreach ($def['opsi'] as $kode => $label)
+                        <label class="ib-checkbox">
+                            <input type="checkbox" data-filter-multi="{{ $grup }}" data-filter-value="{{ $kode }}" @checked(in_array($kode, $dipilih, true))>
+                            <span>{{ $label }}</span>
+                            <small>{{ $jumlahTag[$grup][$kode] ?? 0 }}</small>
+                        </label>
+                    @endforeach
+                </fieldset>
 
-            <div class="ib-divider"></div>
+                <div class="ib-divider"></div>
+            @endforeach
 
             <fieldset class="ib-filter-group">
                 <legend class="ib-section-title">Rentang harga produk</legend>
@@ -49,8 +54,7 @@
 
         <main class="ib-main">
 
-            @include('public.partials.trending', ['trending' => $trending, 'badge' => 'digital'])
-
+            {{-- Hasil pencarian langsung di atas (bagian "Pilihan teratas · Trending" ditiadakan) --}}
             <h2 class="ib-result-title">Ditemukan <strong>{{ number_format($umkm->total(), 0, ',', '.') }}</strong> brand</h2>
 
             @if ($umkm->isEmpty())

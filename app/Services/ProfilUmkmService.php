@@ -2,8 +2,11 @@
 namespace App\Services;
 
 use App\Models\Keuangan;
+use App\Models\PemilikUsaha;
 use App\Models\Produk;
 use App\Models\Umkm;
+use App\Models\User;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -55,6 +58,9 @@ class ProfilUmkmService
             'nama_usaha'       => ['label' => 'Nama UMKM/Usaha', 'bagian' => 'usaha', 'tipe' => 'text', 'wajib' => true, 'aturan' => ['string', 'max:255']],
             'alamat_usaha'     => ['label' => 'Alamat Usaha', 'bagian' => 'usaha', 'tipe' => 'textarea', 'wajib' => true, 'aturan' => ['string', 'max:1000'],
                                    'bantuan' => 'Kabupaten/kota diperbarui otomatis bila nama kabupaten disebut di alamat.'],
+            'kabupaten'        => ['label' => 'Kota/Kabupaten', 'bagian' => 'usaha', 'tipe' => 'select', 'wajib' => true,
+                                   'opsi' => Umkm::KABUPATEN_LENGKAP, 'aturan' => [Rule::in(array_keys(Umkm::KABUPATEN_LENGKAP))],
+                                   'bantuan' => 'Wilayah UMKM di peta interaktif & filter. Ikut diperbarui bila nama kota/kabupaten disebut di alamat usaha.'],
             'tahun_berdiri'    => ['label' => 'Tahun Berdirinya Usaha', 'bagian' => 'usaha', 'tipe' => 'number', 'aturan' => ['nullable', 'integer', 'min:1900', 'max:' . date('Y')]],
             'sektor'           => ['label' => 'Sektor Usaha', 'bagian' => 'usaha', 'tipe' => 'select', 'wajib' => true, 'opsi' => Umkm::SEKTOR_LABEL, 'aturan' => [Rule::in(array_keys(Umkm::SEKTOR_LABEL))]],
             'jumlah_karyawan'  => ['label' => 'Jumlah Karyawan', 'bagian' => 'usaha', 'tipe' => 'number', 'aturan' => ['nullable', 'integer', 'min:0', 'max:1000000']],
@@ -97,6 +103,42 @@ class ProfilUmkmService
     }
 
     /**
+     * Nama lembaga pada label program: Super Admin → Bank Indonesia / KPw BI,
+     * Admin OPD → nama OPD-nya (mis. "Dinas Koperasi Kota Pontianak").
+     *
+     * @return array{program: string, rekomendasi: string}
+     */
+    public static function lembaga(?User $user): array
+    {
+        if (! $user || $user->isSuperAdmin()) {
+            return ['program' => 'Bank Indonesia', 'rekomendasi' => 'KPw BI'];
+        }
+
+        $opd = $user->opd?->nama_opd ?: 'OPD';
+
+        return ['program' => $opd, 'rekomendasi' => $opd];
+    }
+
+    /** kolom() dengan label program sesuai lembaga pengguna (lihat lembaga()). */
+    public static function kolomUntuk(?User $user): array
+    {
+        $l     = self::lembaga($user);
+        $kolom = self::kolom();
+
+        $kolom['program_bi']['label']           = "Program yang pernah diikuti dari {$l['program']}";
+        $kolom['rekomendasi_program']['label']   = "Rekomendasi Program {$l['rekomendasi']}";
+        $kolom['rekomendasi_program']['bantuan'] = "Boleh lebih dari satu program. Program yang ditetapkan {$l['rekomendasi']} untuk UMKM ini.";
+
+        return $kolom;
+    }
+
+    /** BAGIAN dengan judul bagian rekomendasi sesuai lembaga pengguna. */
+    public static function bagianUntuk(?User $user): array
+    {
+        return array_replace(self::BAGIAN, ['rekomendasi' => 'Rekomendasi Program ' . self::lembaga($user)['rekomendasi']]);
+    }
+
+    /**
      * Nilai saat ini untuk seluruh kolom.
      */
     public function nilai(Umkm $umkm): array
@@ -117,6 +159,7 @@ class ProfilUmkmService
 
             'nama_usaha'       => $umkm->nama_usaha,
             'alamat_usaha'     => $umkm->alamat_usaha,
+            'kabupaten'        => $umkm->kabupaten,
             'tahun_berdiri'    => $umkm->tahun_berdiri,
             'sektor'           => $umkm->sektor,
             'jumlah_karyawan'  => $umkm->jumlah_tenaga_kerja,
@@ -157,20 +200,10 @@ class ProfilUmkmService
     {
         $def = self::kolom()[$kolom] ?? throw ValidationException::withMessages(['kolom' => 'Kolom tidak dikenal.']);
 
-        $nilai = match (true) {
-            is_string($nilai) => trim($nilai),
-            // Daftar: rapikan spasi, buang yang kosong & duplikat (tanpa membedakan huruf besar)
-            is_array($nilai)  => array_values(collect($nilai)
-                ->map(fn ($v) => is_string($v) ? preg_replace('/\s+/u', ' ', trim($v)) : $v)
-                ->filter(fn ($v) => $v !== '' && $v !== null)
-                ->unique(fn ($v) => is_string($v) ? mb_strtolower($v) : $v)
-                ->all()),
-            default           => $nilai,
-        };
-        $nilai = ($nilai === '' || $nilai === [] ? null : $nilai);
+        $nilai = self::rapikan($nilai);
 
         Validator::make(['nilai' => $nilai], array_filter([
-            'nilai'   => array_merge(! empty($def['wajib']) ? ['required'] : [], $def['aturan']),
+            'nilai'   => self::aturan($def),
             'nilai.*' => $def['aturanItem'] ?? null,
         ]), [
             'nilai.required' => "{$def['label']} wajib diisi dan tidak dapat dihapus.",
@@ -190,6 +223,116 @@ class ProfilUmkmService
             $this->terapkan($umkm, $kolom, $nilai, $produk);
             $this->scoring->simpan($umkm->fresh());
         });
+    }
+
+    /**
+     * Tambah UMKM baru secara manual dari seluruh kolom profil (halaman Import Data).
+     * Data masuk ke tabel yang sama dengan import & "Kelola Profil UMKM", lalu skor dihitung.
+     * Pemilik dengan nomor WhatsApp yang sudah terdaftar dipakai ulang (tidak digandakan, datanya tidak diubah).
+     *
+     * Bila $cekDuplikat dan skor kemiripan dengan UMKM tersimpan ≥ ambang (DeteksiDuplikatService),
+     * UMKM TIDAK dibuat: data masuk antrean review dan 'umkm' bernilai null.
+     *
+     * @return array{umkm: ?Umkm, pemilikTerdaftar: bool, antrean: ?\App\Models\UmkmDuplikat}
+     *
+     * @throws ValidationException
+     */
+    public function buat(array $input, int $opdId, ?User $user = null, bool $cekDuplikat = true): array
+    {
+        $kolom = self::kolom();
+        $data  = [];
+        $rules = [];
+        $label = [];
+        foreach ($kolom as $k => $def) {
+            $data[$k]  = self::rapikan($input[$k] ?? null);
+            $rules[$k] = self::aturan($def);
+            if (isset($def['aturanItem'])) {
+                $rules["{$k}.*"] = $def['aturanItem'];
+            }
+            $label[$k] = rtrim($def['label'], ' :?');
+        }
+
+        Validator::make($data, $rules, [
+            'regex'                     => ':attribute tidak valid (8–20 digit).',
+            'rekomendasi_program.max'   => 'Maksimal ' . self::MAKS_PROGRAM . ' program.',
+            'rekomendasi_program.*.max' => 'Nama program maksimal 150 karakter.',
+        ], $label)->validate();
+
+        // Kolom yang dipakai saat membuat baris UMKM & pemilik; sisanya lewat terapkan()
+        $dasar   = ['pemilik_nama', 'pemilik_alamat', 'pemilik_whatsapp', 'pemilik_email', 'nama_usaha', 'alamat_usaha', 'kabupaten', 'sektor'];
+        $telepon = self::bersihkanTelepon($data['pemilik_whatsapp']);
+
+        // Kemungkinan duplikat (skor kemiripan ≥ ambang) → antrean review, belum disimpan
+        if ($cekDuplikat) {
+            $deteksi = app(DeteksiDuplikatService::class);
+            if ($hasil = $deteksi->periksa($data)) {
+                return ['umkm' => null, 'pemilikTerdaftar' => false, 'antrean' => $deteksi->antrekan($data, $hasil, $opdId, $user, 'manual')];
+            }
+        }
+
+        return DB::transaction(function () use ($data, $kolom, $dasar, $telepon, $opdId) {
+            $pemilik = PemilikUsaha::firstOrCreate(['telepon' => $telepon], [
+                'nama_lengkap'  => $data['pemilik_nama'],
+                'nik'           => 'NIK-' . Str::random(10),
+                'jenis_kelamin' => 'L',
+                'alamat'        => $data['pemilik_alamat'],
+                'kabupaten'     => Umkm::tebakKabupaten($data['pemilik_alamat']) ?? Umkm::KABUPATEN_KOSONG,
+                'kecamatan'     => '-',
+                'email'         => $data['pemilik_email'],
+            ]);
+
+            $umkm = Umkm::create([
+                'pemilik_usaha_id' => $pemilik->id,
+                'opd_id'           => $opdId,
+                'nama_usaha'       => $data['nama_usaha'],
+                'slug'             => Str::slug($data['nama_usaha']) . '-' . Str::random(5),
+                'sektor'           => $data['sektor'],
+                'kabupaten'        => $data['kabupaten'], // dipilih langsung di formulir
+                'kecamatan'        => '-',
+                'alamat_usaha'     => $data['alamat_usaha'],
+                'whatsapp'         => $telepon, // WA bisnis default = WA pemilik (sama dengan import)
+                'status'           => 'aktif',
+            ]);
+
+            // Urutan kolom() menjamin produk unggulan dibuat sebelum kapasitas & foto_url
+            foreach ($kolom as $k => $def) {
+                if (! in_array($k, $dasar, true) && $data[$k] !== null) {
+                    $this->terapkan($umkm, $k, $data[$k], $umkm->produkUtama());
+                }
+            }
+
+            // Baris pendamping selalu ada, sama seperti hasil import
+            $umkm->legalitas()->firstOrCreate([]);
+            $umkm->pemasaran()->firstOrCreate([]);
+            $umkm->profil()->firstOrCreate([]);
+            $this->keuangan($umkm);
+
+            $this->scoring->simpan($umkm->fresh());
+
+            return ['umkm' => $umkm->fresh(), 'pemilikTerdaftar' => ! $pemilik->wasRecentlyCreated, 'antrean' => null];
+        });
+    }
+
+    /** Rapikan nilai masukan: trim teks; daftar dibersihkan dari kosong & duplikat. Kosong → null. */
+    private static function rapikan(mixed $nilai): mixed
+    {
+        $nilai = match (true) {
+            is_string($nilai) => trim($nilai),
+            // Daftar: rapikan spasi, buang yang kosong & duplikat (tanpa membedakan huruf besar)
+            is_array($nilai)  => array_values(collect($nilai)
+                ->map(fn ($v) => is_string($v) ? preg_replace('/\s+/u', ' ', trim($v)) : $v)
+                ->filter(fn ($v) => $v !== '' && $v !== null)
+                ->unique(fn ($v) => is_string($v) ? mb_strtolower($v) : $v)
+                ->all()),
+            default           => $nilai,
+        };
+
+        return $nilai === '' || $nilai === [] ? null : $nilai;
+    }
+
+    private static function aturan(array $def): array
+    {
+        return array_merge(! empty($def['wajib']) ? ['required'] : [], $def['aturan']);
     }
 
     private function terapkan(Umkm $umkm, string $kolom, mixed $nilai, ?Produk $produk): void
@@ -215,6 +358,9 @@ class ProfilUmkmService
                 break;
             case 'alamat_usaha':
                 $umkm->update(['alamat_usaha' => $nilai, 'kabupaten' => Umkm::tebakKabupaten($nilai) ?? $umkm->kabupaten]);
+                break;
+            case 'kabupaten':
+                $umkm->update(['kabupaten' => $nilai]);
                 break;
             case 'tahun_berdiri':
                 $umkm->update(['tahun_berdiri' => $nilai]);
@@ -381,7 +527,11 @@ class ProfilUmkmService
 
     private function keuangan(Umkm $umkm): Keuangan
     {
-        return $umkm->keuanganTerakhir ?? $umkm->keuangan()->create(['tahun' => date('Y')]);
+        // Simpan ke relasi agar beberapa kolom keuangan dalam satu proses tidak membuat baris ganda
+        if (! $umkm->keuanganTerakhir) {
+            $umkm->setRelation('keuanganTerakhir', $umkm->keuangan()->create(['tahun' => date('Y')]));
+        }
+        return $umkm->keuanganTerakhir;
     }
 
     private function daftarAda($legalitas, array $peta): ?string

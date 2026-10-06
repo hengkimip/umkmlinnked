@@ -27,7 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Header keamanan (nosniff, anti-clickjacking, HSTS di HTTPS, no-store untuk admin)
-        $middleware->web(append: [\App\Http\Middleware\SecurityHeaders::class]);
+        // Global (bukan hanya grup web) agar halaman galat 404/500 juga mendapat header keamanan & CSP
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->web(append: [
+            // Akun / OPD yang dinonaktifkan Super Admin langsung dikeluarkan dari sesi
+            \App\Http\Middleware\PastikanAksesAktif::class,
+        ]);
 
         // Pengguna yang sudah login dan membuka /login diarahkan sesuai peran (FR-16)
         $middleware->redirectUsersTo(

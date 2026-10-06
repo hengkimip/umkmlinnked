@@ -64,7 +64,65 @@ class PublicPagesTest extends TestCase
         }
     }
 
-    public function test_sector_filter_only_lists_existing_sectors(): void
+    public function test_semua_brand_starts_with_results_without_trending_section(): void
+    {
+        $this->umkm();
+
+        $html = $this->get('/semua-brand')->assertOk()
+            ->assertDontSee('Pilihan teratas')
+            ->assertSee('Ditemukan <strong>1</strong> brand', false)
+            ->getContent();
+
+        // Judul hasil adalah isi pertama kolom utama
+        $this->assertMatchesRegularExpression('#<main class="ib-main">\s*(<!--.*?-->\s*)?<h2 class="ib-result-title">#s', $html);
+    }
+
+    public function test_semua_brand_has_the_four_filter_groups_of_the_map(): void
+    {
+        $this->umkm();
+
+        $res = $this->get('/semua-brand')->assertOk();
+        $res->assertSeeInOrder(['Sektor Usaha', 'Platform Digital', 'Jangkauan Pasar', 'Sertifikasi Produk', 'Rentang harga produk']);
+        foreach (\App\Support\TagUmkm::FILTER as $grup => $def) {
+            foreach ($def['opsi'] as $kode => $label) {
+                $res->assertSee('data-filter-multi="' . $grup . '" data-filter-value="' . $kode . '"', false);
+                $res->assertSee(e($label), false);
+            }
+        }
+    }
+
+    public function test_semua_brand_multi_filters_match_the_map(): void
+    {
+        // Kopi Kapuas: kuliner, Instagram + WhatsApp, regional, Halal
+        $this->umkm();
+        $tenun = $this->umkm([
+            'nama_usaha' => 'Tenun Sambas', 'sektor' => 'kerajinan', 'kabupaten' => 'Sambas',
+            'instagram' => null, 'shopee' => 'https://shopee.co.id/tenun',
+        ]);
+        $tenun->pemasaran()->update(['jangkauan_pasar' => 'ekspor', 'platform_online' => []]);
+        $tenun->legalitas()->update(['nomor_halal' => null]);
+        $tenun->profil()->create(['sertifikasi_produk' => 'Merek terdaftar (HAKI)']);
+
+        $hasil = fn (string $q) => $this->get('/semua-brand?' . $q)->assertOk();
+
+        // Satu grup: salah satu cocok (ATAU)
+        $hasil('sektor=kuliner,kerajinan')->assertSee('Ditemukan <strong>2</strong> brand', false);
+        $hasil('platform=shopee')->assertSee('Ditemukan <strong>1</strong> brand', false)->assertSee('Tenun Sambas');
+        $hasil('jangkauan=ekspor')->assertSee('Ditemukan <strong>1</strong> brand', false)->assertSee('Tenun Sambas');
+        $hasil('sertifikasi=hki')->assertSee('Ditemukan <strong>1</strong> brand', false)->assertSee('Tenun Sambas');
+        // Antar-grup: semuanya harus cocok (DAN)
+        $hasil('sektor=kuliner&jangkauan=ekspor')->assertSee('Ditemukan <strong>0</strong> brand', false);
+        // Pilihan tercentang & dibawa saat mencari; nilai asing dibuang
+        $hasil('platform=shopee,evil,tiktok')
+            ->assertSee('name="platform" value="shopee,tiktok"', false)
+            ->assertSee('data-filter-multi="platform" data-filter-value="shopee" checked', false);
+
+        // Kode sertifikasi baru tidak membuat Go Global galat (dulu dipakai sebagai nama kolom)
+        $this->get('/go-global?sertifikasi=hki,organik')->assertOk();
+        $this->get('/go-digital?platform=website')->assertOk();
+    }
+
+    public function test_sector_filter_lists_known_sectors_only(): void
     {
         $this->umkm();
         $this->umkm(['nama_usaha' => 'Tenun Sambas', 'sektor' => 'kerajinan', 'kabupaten' => 'Sambas']);
@@ -127,8 +185,7 @@ class PublicPagesTest extends TestCase
 
         $this->get(route('direktori.show', $umkm->slug))
             ->assertOk()
-            ->assertSee('Pesan via WhatsApp')
-            ->assertSee('https://wa.me/6281200001111?text=', false)       // pesan pembuka terisi
+            ->assertSee('https://wa.me/6281200001111?text=', false)       // pesan pembuka terisi (galeri & bilah HP)
             ->assertSee('href="https://tk.tokopedia.com/abc/"', false)   // URL tokopedia diambil dari teks campuran
             ->assertSee('href="https://www.instagram.com/Eduscale.id/"', false)
             ->assertDontSee('javascript:alert', false)                    // skema berbahaya ditolak
@@ -174,6 +231,66 @@ class PublicPagesTest extends TestCase
             ->assertSee('logo-umkmlinked.webp')
             ->assertSee('href="' . route('home') . '"', false)
             ->assertSee(route('direktori.index'));
+    }
+
+    public function test_navbar_has_map_after_semua_brand_without_go_digital_and_go_global(): void
+    {
+        $nav = fn () => \Illuminate\Support\Str::betweenFirst($this->get('/')->assertOk()->getContent(), '<nav aria-label="Menu utama">', '</nav>');
+
+        $html = $nav();
+        $this->assertMatchesRegularExpression('#Semua Brand</a>\s*</li>\s*<li>\s*<a href="' . preg_quote(route('superadmin.peta-interaktif'), '#') . '"[^>]*>Peta Interaktif</a>#', $html);
+        foreach (['Tentang Kami', 'Berita', 'Kemitraan', 'Login Admin'] as $menu) {
+            $this->assertStringContainsString($menu, $html);
+        }
+        $this->assertStringNotContainsString('Go Digital', $html);
+        $this->assertStringNotContainsString('Go Global', $html);
+
+        // Peta terbuka: tamu langsung masuk tanpa login
+        $this->get('/peta-interaktif')->assertOk();
+    }
+
+    public function test_detail_hides_score_and_workforce_and_links_address_to_google_maps(): void
+    {
+        $umkm = $this->umkm([
+            'alamat_usaha' => 'Jl. Gajah Mada No. 10', 'jumlah_tenaga_kerja' => 7, 'skor_total' => 63,
+        ]);
+
+        $this->get("/semua-brand/{$umkm->slug}")
+            ->assertOk()
+            ->assertDontSee('Skor kesiapan usaha')
+            ->assertDontSee('Tenaga kerja')
+            ->assertDontSee('7 orang')
+            ->assertSee('Jl. Gajah Mada No. 10')
+            ->assertSee('Buka di Google Maps')
+            ->assertSee(e('https://www.google.com/maps/search/?api=1&query=' . rawurlencode('Jl. Gajah Mada No. 10, Kota Pontianak, Kalimantan Barat')), false);
+
+        // Kartu "Pesan langsung ke penjual" tanpa tombol "Pesan via WhatsApp"
+        $html = $this->get("/semua-brand/{$umkm->slug}")->getContent();
+        $kartu = \Illuminate\Support\Str::betweenFirst($html, '<aside class="ib-order"', '</aside>');
+        $this->assertStringContainsString('Pesan langsung ke penjual', $kartu);
+        $this->assertStringNotContainsString('Pesan via WhatsApp', $kartu);
+
+        // Tanpa alamat: tombol Google Maps tidak muncul
+        $tanpaAlamat = $this->umkm(['alamat_usaha' => '-']);
+        $this->get("/semua-brand/{$tanpaAlamat->slug}")->assertOk()->assertDontSee('Buka di Google Maps');
+    }
+
+    public function test_detail_gallery_has_prev_next_arrows_only_with_multiple_photos(): void
+    {
+        $umkm = $this->umkm();
+        $foto = fn (string $nama, int $urutan) => $umkm->produk()->create([
+            'nama_produk' => $nama, 'urutan' => $urutan, 'is_active' => true,
+            'foto_url' => "https://example.com/{$urutan}.jpg",
+        ]);
+
+        $foto('Kopi Bubuk', 1);
+        $this->get("/semua-brand/{$umkm->slug}")->assertOk()->assertDontSee('data-gallery-next', false);
+
+        $foto('Kopi Sachet', 2);
+        $foto('Kopi Literan', 3);
+        $this->get("/semua-brand/{$umkm->slug}")
+            ->assertOk()
+            ->assertSeeInOrder(['aria-label="Foto sebelumnya"', 'aria-label="Foto berikutnya"', '1 / 3'], false);
     }
 
     public function test_home_shows_four_products_in_every_row(): void

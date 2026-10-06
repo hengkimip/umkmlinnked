@@ -49,6 +49,30 @@ class ProfilUmkm extends Model
         return $hitung;
     }
 
+    /**
+     * Pecah jawaban bebas "Program yang pernah diikuti dari Bank Indonesia" menjadi daftar
+     * nama program (per baris, titik koma, koma, atau penomoran). Jawaban kosong seperti
+     * "Tidak ada" / "Belum" / "-" diabaikan; nama ganda dalam satu jawaban hanya dihitung sekali.
+     *
+     * @return list<string>
+     */
+    public static function daftarProgramBi(?string $teks): array
+    {
+        $bagian = preg_split('/\r\n|\r|\n|;|,|•|\s\d{1,2}[.)]\s/u', (string) $teks) ?: [];
+
+        $hasil = [];
+        foreach ($bagian as $nama) {
+            $nama = preg_replace(['/\s+/u', '/^\s*\d{1,2}[.)]\s*/u'], [' ', ''], $nama);
+            $nama = trim($nama, " \t-–*.:");
+            if (mb_strlen($nama) < 3 || preg_match('/^(tidak|belum|tdk|blm|none|nihil|n\/a|kosong)\b/iu', $nama)) {
+                continue;
+            }
+            $hasil[mb_strtolower($nama)] ??= $nama;
+        }
+
+        return array_values($hasil);
+    }
+
     public function umkm()
     {
         return $this->belongsTo(Umkm::class);

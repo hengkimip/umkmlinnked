@@ -68,11 +68,137 @@ class ProfilUmkmTest extends TestCase
             ->assertSee('foto_url');
     }
 
-    public function test_admin_opd_cannot_view_or_edit_other_region(): void
+    public function test_page_shows_score_breakdown_and_auto_recommendations_like_map_detail(): void
+    {
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd();
+
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$umkm->id}")
+            ->assertOk()
+            ->assertSeeInOrder(['Rincian skor kesiapan', 'Data pemilik usaha', 'Rekomendasi Program Dinas A', 'Usulan otomatis sistem'])
+            ->assertSee('Pendampingan Sertifikasi Halal') // usulan otomatis: UMKM kuliner tanpa Halal
+            ->assertViewHas('rincianSkor', fn ($r) => end($r) === ['label' => 'Keuangan', 'nilai' => 0, 'maks' => 15]);
+
+        // Setelah kolom disimpan, skor & usulan dikirim ulang agar tampilan ikut berubah
+        $res = $this->ubah($admin, $umkm, 'sertifikasi_produk', 'Halal')->assertOk();
+
+        $this->assertSame(['Legalitas', 'Sertifikasi', 'Produksi', 'Pemasaran', 'Keuangan'], array_column($res->json('rincian_skor'), 'label'));
+        $this->assertGreaterThan(0, collect($res->json('rincian_skor'))->firstWhere('label', 'Sertifikasi')['nilai']);
+        $this->assertNotContains('Pendampingan Sertifikasi Halal', array_column($res->json('rekomendasi'), 'program'));
+    }
+
+    public function test_page_has_searchable_umkm_picker_and_delete_button(): void
+    {
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd();
+
+        $this->actingAs($admin)->get('/admin/profil-umkm')
+            ->assertOk()
+            ->assertSee('Cari nama UMKM atau kabupaten/kota')
+            ->assertSee('Kopi A')
+            ->assertDontSee('Hapus UMKM');
+
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$umkm->id}")
+            ->assertOk()
+            // Tombol Hapus UMKM di atas Foto produk; notifikasi konfirmasi dengan tombol Batal & Hapus
+            ->assertSeeInOrder(['Hapus UMKM', 'Foto produk'])
+            ->assertSeeInOrder([
+                'Apakah Anda yakin ingin menghapus data UMKM ini? Tindakan ini tidak dapat dibatalkan.',
+                '>Batal<', '>Hapus<',
+            ], false);
+    }
+
+    public function test_delete_umkm_archives_it_and_logs_who_deleted_it(): void
+    {
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd();
+
+        $this->actingAs($admin)
+            ->delete("/admin/profil-umkm/{$umkm->id}")
+            ->assertRedirect('/admin/profil-umkm')
+            ->assertSessionHas('success', 'UMKM "Kopi A" telah dihapus.');
+
+        $this->assertSoftDeleted($umkm);
+        $this->assertDatabaseHas('activity_log', [
+            'subject_type' => Umkm::class,
+            'subject_id'   => $umkm->id,
+            'event'        => 'deleted',
+            'causer_id'    => $admin->id,
+        ]);
+
+        // Hilang dari daftar admin, direktori publik, dan peta
+        $this->actingAs($admin)->get('/admin/profil-umkm')
+            ->assertSee('telah dihapus')
+            ->assertViewHas('daftarUmkm', fn ($daftar) => $daftar->isEmpty());
+        $this->get("/semua-brand/{$umkm->slug}")->assertNotFound();
+        $super = User::factory()->create()->assignRole(User::ROLE_SUPER_ADMIN);
+        $this->actingAs($super)->getJson('/peta-interaktif/data')->assertJsonCount(0, 'umkm');
+    }
+
+    public function test_admin_opd_cannot_delete_umkm_of_other_region(): void
     {
         $lain = $this->umkm($this->opdB);
 
-        $this->actingAs($this->adminOpd())->get("/admin/profil-umkm?umkm={$lain->id}")->assertForbidden();
+        $this->actingAs($this->adminOpd())->delete("/admin/profil-umkm/{$lain->id}")->assertForbidden();
+        $this->assertNotSoftDeleted($lain);
+    }
+
+    public function test_only_opd_pembina_and_super_admin_can_edit_profile(): void
+    {
+        $milik     = $this->umkm($this->opdA);
+        $lain      = $this->umkm($this->opdB);
+        $tanpaOpd  = $this->umkm($this->opdA);
+        \Illuminate\Support\Facades\DB::table('umkm')->where('id', $tanpaOpd->id)->update(['opd_id' => null]);
+        $admin     = $this->adminOpd();
+        $super     = User::factory()->create()->assignRole(User::ROLE_SUPER_ADMIN);
+
+        // Admin OPD melihat SEMUA UMKM di daftar pilihan; binaannya ditandai
+        $this->actingAs($admin)->get('/admin/profil-umkm')
+            ->assertViewHas('daftarUmkm', fn ($d) => $d->count() === 3);
+
+        // Admin OPD pembina (Otoritas Edit): lihat, ubah, hapus UMKM binaannya
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$milik->id}")->assertOk()
+            ->assertViewHas('bolehUbah', true)
+            ->assertSeeInOrder(['Binaan Dinas A', 'Otoritas Edit', 'Didaftar ' . $milik->created_at->format('d/m/Y')])
+            ->assertSee('title="Dapat diubah oleh: Dinas A (OPD pembina) &amp; Super Admin"', false) // rincian di tooltip
+            ->assertDontSee('status binaan tetap</p>', false)
+            ->assertDontSee('Mode lihat saja')
+            ->assertSee('Hapus UMKM')
+            ->assertSee("@click=\"mulai('tahun_berdiri')\"", false);
+        $this->ubah($admin, $milik, 'tahun_berdiri', 2020)->assertOk();
+
+        // Admin OPD bukan pembina: boleh MELIHAT (mode lihat saja), tidak bisa mengubah atau menghapus
+        foreach ([$lain, $tanpaOpd->fresh()] as $u) {
+            $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$u->id}")->assertOk()
+                ->assertViewHas('bolehUbah', false)
+                ->assertSee('Mode lihat saja')
+                ->assertSee('Kopi ' . ($u->is($lain) ? 'B' : 'A'))
+                ->assertDontSee("@click=\"mulai('tahun_berdiri')\"", false)  // tombol Ubah per kolom
+                ->assertDontSee('Hapus UMKM')
+                ->assertDontSee(route('admin.produk.upload-foto', ['umkm' => $u->id]), false);
+            $this->ubah($admin, $u, 'tahun_berdiri', 2001)->assertForbidden();
+            $this->actingAs($admin)->delete("/admin/profil-umkm/{$u->id}")->assertForbidden();
+            $this->assertNull($u->fresh()->tahun_berdiri);
+            $this->assertNotSoftDeleted($u);
+        }
+
+        // Super Admin: semua UMKM, termasuk binaan OPD lain & tanpa OPD pembina
+        $this->actingAs($super)->get('/admin/profil-umkm')
+            ->assertViewHas('daftarUmkm', fn ($d) => $d->count() === 3);
+        foreach ([$milik, $lain, $tanpaOpd] as $u) {
+            $this->actingAs($super)->get("/admin/profil-umkm?umkm={$u->id}")->assertOk();
+            $this->ubah($super, $u, 'tahun_berdiri', 2015)->assertOk();
+            $this->assertSame(2015, $u->fresh()->tahun_berdiri);
+        }
+        $this->actingAs($super)->get("/admin/profil-umkm?umkm={$tanpaOpd->id}")
+            ->assertSee('Dapat diubah oleh: Super Admin');
+    }
+
+    public function test_admin_opd_can_view_but_not_edit_other_region(): void
+    {
+        $lain = $this->umkm($this->opdB);
+
+        $this->actingAs($this->adminOpd())->get("/admin/profil-umkm?umkm={$lain->id}")->assertOk()->assertSee('Mode lihat saja');
         $this->ubah($this->adminOpd(), $lain, 'nama_usaha', 'Diambil alih')->assertForbidden();
 
         $this->assertSame('Kopi B', $lain->fresh()->nama_usaha);
@@ -151,13 +277,13 @@ class ProfilUmkmTest extends TestCase
         ]);
 
         $super = User::factory()->create()->assignRole(User::ROLE_SUPER_ADMIN);
-        $this->actingAs($super)->get("/superadmin/peta-interaktif/umkm/{$umkm->id}")
+        $this->actingAs($super)->get("/peta-interaktif/umkm/{$umkm->id}")
             ->assertOk()
             ->assertSeeInOrder(['Ditetapkan KPw BI', 'Pendampingan Sertifikasi Halal', 'QRIS', 'Business Matching Ekspor', 'Usulan otomatis sistem']);
 
         // Hapus = daftar kosong
         $this->ubah($admin, $umkm, 'rekomendasi_program', null)->assertOk()->assertJsonPath('nilai.rekomendasi_program', []);
-        $this->actingAs($super)->get("/superadmin/peta-interaktif/umkm/{$umkm->id}")->assertSee('Belum ada program yang ditetapkan.');
+        $this->actingAs($super)->get("/peta-interaktif/umkm/{$umkm->id}")->assertSee('Belum ada program yang ditetapkan.');
     }
 
     public function test_rekomendasi_program_suggests_programs_from_other_umkm(): void
@@ -191,6 +317,95 @@ class ProfilUmkmTest extends TestCase
         $this->ubah($admin, $umkm, 'rekomendasi_program', array_map(fn ($i) => "Program {$i}", range(1, 21)))
             ->assertStatus(422)->assertJsonPath('errors.nilai.0', 'Maksimal 20 program.');
         $this->ubah($admin, $umkm, 'pemilik_email', ['bukan@teks.id'])->assertStatus(422);
+    }
+
+    public function test_program_labels_follow_the_users_institution(): void
+    {
+        $umkm = $this->umkm($this->opdA);
+
+        // Super Admin: Bank Indonesia / KPw BI
+        $super = User::factory()->create()->assignRole(User::ROLE_SUPER_ADMIN);
+        $this->actingAs($super)->get("/admin/profil-umkm?umkm={$umkm->id}")->assertOk()
+            ->assertSee('Program yang pernah diikuti dari Bank Indonesia')
+            ->assertSee('Rekomendasi Program KPw BI')
+            ->assertSee('tim KPw BI Kalimantan Barat');
+        $this->actingAs($super)->get('/admin/import')->assertOk()
+            ->assertSee('Program yang pernah diikuti dari Bank Indonesia')->assertSee('Rekomendasi Program KPw BI');
+
+        // Admin OPD: nama OPD-nya
+        $admin = $this->adminOpd();
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$umkm->id}")->assertOk()
+            ->assertSee('Program yang pernah diikuti dari Dinas A')
+            ->assertSee('Rekomendasi Program Dinas A')
+            ->assertDontSee('Bank Indonesia')
+            ->assertDontSee('KPw BI');
+        $this->actingAs($admin)->get('/admin/import')->assertOk()
+            ->assertSee('Program yang pernah diikuti dari Dinas A')->assertSee('Rekomendasi Program Dinas A');
+        $this->ubah($admin, $umkm, 'rekomendasi_program', ['Pelatihan Ekspor'])
+            ->assertJsonPath('message', 'Rekomendasi Program Dinas A berhasil disimpan.');
+    }
+
+    public function test_kota_kabupaten_field_is_editable_in_kelola_profil(): void
+    {
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd();
+
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$umkm->id}")->assertOk()
+            ->assertSeeInOrder(['Data usaha', 'Alamat Usaha', 'Kota/Kabupaten', 'Tahun Berdirinya Usaha']);
+
+        $this->ubah($admin, $umkm, 'kabupaten', 'Kubu Raya')->assertOk()->assertJsonPath('kabupaten', 'Kubu Raya');
+        $this->assertSame('Kubu Raya', $umkm->fresh()->kabupaten);
+
+        $this->ubah($admin, $umkm, 'kabupaten', 'Jakarta')->assertUnprocessable();
+        $this->ubah($admin, $umkm, 'kabupaten', null)->assertUnprocessable(); // wajib, tidak bisa dihapus
+    }
+
+    public function test_profile_header_shows_binaan_opd(): void
+    {
+        $umkm = $this->umkm($this->opdA);
+
+        $this->actingAs($this->adminOpd())->get("/admin/profil-umkm?umkm={$umkm->id}")->assertOk()
+            ->assertSeeInOrder(['Binaan Dinas A', 'Profil UMKM', 'Kopi A']);
+    }
+
+    public function test_import_queues_umkm_already_registered_by_any_opd(): void
+    {
+        $file = fn () => UploadedFile::fake()->createWithContent('data.csv', implode("
+", [
+            'nama_pemilik_usaha,no_whatsapp,nama_umkmusaha,alamat_usaha,sektor_usaha',
+            'Ani,081211110001,Amplang Ani,"Jl. A, Pontianak",Kuliner',
+            'Ani,081211110001,AMPLANG  ani,"Jl. A, Pontianak",Kuliner',   // ganda di file yang sama
+        ]));
+
+        $this->actingAs($this->adminOpd())->post('/admin/import', ['file' => $file()])
+            ->assertSessionHas('success', 'Berhasil mengimpor 1 data UMKM. 1 baris mirip UMKM yang sudah terdaftar dan masuk antrean review duplikat.')
+            ->assertSessionMissing('import_errors');
+
+        // OPD lain mengunggah file yang sama → kedua baris masuk antrean, tidak disimpan
+        $this->actingAs($this->adminOpd($this->opdB))->post('/admin/import', ['file' => $file()])
+            ->assertSessionHas('success', 'Berhasil mengimpor 0 data UMKM. 2 baris mirip UMKM yang sudah terdaftar dan masuk antrean review duplikat.');
+
+        $this->assertSame(1, Umkm::where('nama_usaha', 'like', 'amplang%')->count());
+        $this->assertSame(3, \App\Models\UmkmDuplikat::menunggu()->where('sumber', 'impor')->count());
+    }
+
+    public function test_csv_template_and_import_use_kota_kabupaten_column(): void
+    {
+        $template = $this->actingAs($this->adminOpd())->get('/admin/import/template')->assertOk()->streamedContent();
+        $this->assertStringContainsString('alamat_usaha,kota_kabupaten,tahun_berdirinya_usaha', $template);
+        $this->assertStringContainsString('"Kota Pontianak"', $template);
+
+        // Kolom kota_kabupaten diutamakan; bila kosong, ditebak dari alamat
+        $csv = UploadedFile::fake()->createWithContent('data.csv', implode("
+", [
+            'nama_pemilik_usaha,no_whatsapp,nama_umkmusaha,alamat_usaha,kota_kabupaten,sektor_usaha',
+            'Ani,081211110001,Amplang Ani,"Jl. A, Pontianak",Kab. Sambas,Kuliner',
+            'Budi,081211110002,Kopi Budi,"Jl. B, Singkawang",,Kuliner',
+        ]));
+        $this->actingAs($this->adminOpd())->post('/admin/import', ['file' => $csv])->assertSessionHas('success');
+
+        $this->assertSame('Sambas', Umkm::firstWhere('nama_usaha', 'Amplang Ani')->kabupaten);
+        $this->assertSame('Singkawang', Umkm::firstWhere('nama_usaha', 'Kopi Budi')->kabupaten);
     }
 
     public function test_import_keeps_questionnaire_answers(): void

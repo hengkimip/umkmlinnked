@@ -38,6 +38,20 @@ function initFilterCheckboxes() {
             );
         });
     });
+    // Kotak centang banyak pilihan (Semua Brand): ?platform=shopee,tiktok
+    document.querySelectorAll("[data-filter-multi]").forEach((input) => {
+        input.addEventListener("change", function () {
+            const key = this.dataset.filterMulti;
+            const url = new URL(window.location.href);
+            const pilihan = new Set((url.searchParams.get(key) || "").split(",").filter(Boolean));
+            if (this.checked) pilihan.add(this.dataset.filterValue);
+            else pilihan.delete(this.dataset.filterValue);
+            url.searchParams.delete("page");
+            if (pilihan.size) url.searchParams.set(key, [...pilihan].join(","));
+            else url.searchParams.delete(key);
+            window.location.href = url.toString();
+        });
+    });
     document.querySelectorAll("[data-filter-select]").forEach((select) => {
         select.addEventListener("change", function () {
             applyFilter(this.dataset.filterSelect, this.value, !!this.value);
@@ -136,10 +150,40 @@ function initGallery() {
     const wa = gallery.querySelector("[data-gallery-wa]");
     const desc = gallery.querySelector("[data-gallery-desc]");
     const badge = gallery.querySelector("[data-gallery-badge]");
-    const thumbs = gallery.querySelectorAll("[data-thumb-src]");
+    const thumbs = [...gallery.querySelectorAll("[data-thumb-src]")];
+    const count = gallery.querySelector("[data-gallery-count]");
+    let aktif = Math.max(0, thumbs.findIndex((t) => t.getAttribute("aria-pressed") === "true"));
 
-    thumbs.forEach((thumb) => {
+    // Panah kiri/kanan, tombol panah papan ketik, dan geser (swipe) di layar sentuh
+    const geser = (arah) => {
+        if (thumbs.length < 2) return;
+        const t = thumbs[(aktif + arah + thumbs.length) % thumbs.length];
+        t.click();
+        // Gulir deret thumbnail secara horizontal saja (halaman tidak ikut bergeser)
+        const wadah = t.parentElement;
+        const rT = t.getBoundingClientRect();
+        const rW = wadah.getBoundingClientRect();
+        wadah.scrollBy({ left: rT.left - rW.left - (rW.width - rT.width) / 2, behavior: "smooth" });
+    };
+    gallery.querySelector("[data-gallery-prev]")?.addEventListener("click", () => geser(-1));
+    gallery.querySelector("[data-gallery-next]")?.addEventListener("click", () => geser(1));
+    stage.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") geser(-1);
+        if (e.key === "ArrowRight") geser(1);
+    });
+    let mulaiX = null;
+    stage.addEventListener("touchstart", (e) => (mulaiX = e.touches[0].clientX), { passive: true });
+    stage.addEventListener("touchend", (e) => {
+        if (mulaiX === null) return;
+        const dx = e.changedTouches[0].clientX - mulaiX;
+        mulaiX = null;
+        if (Math.abs(dx) > 40) geser(dx < 0 ? 1 : -1);
+    }, { passive: true });
+
+    thumbs.forEach((thumb, i) => {
         thumb.addEventListener("click", () => {
+            aktif = i;
+            if (count) count.textContent = `${i + 1} / ${thumbs.length}`;
             const src = thumb.dataset.thumbSrc;
             if (!img || !SAFE_IMG.test(src)) return;
             img.src = src;

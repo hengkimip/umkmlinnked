@@ -4,15 +4,11 @@
 @section('heading', 'Detail UMKM')
 
 @php
+    // Label lembaga: Super Admin -> Bank Indonesia / KPw BI, Admin OPD -> nama OPD-nya
+    $lembaga = \App\Services\ProfilUmkmService::lembaga(auth()->user());
     $kabupaten = \App\Models\Umkm::KABUPATEN_LENGKAP[$umkm->kabupaten] ?? $umkm->kabupaten;
 
-    $skor = [
-        ['label' => 'Legalitas',   'nilai' => $umkm->skor_legalitas,   'maks' => 25],
-        ['label' => 'Sertifikasi', 'nilai' => $umkm->skor_sertifikasi, 'maks' => 20],
-        ['label' => 'Produksi',    'nilai' => $umkm->skor_produksi,    'maks' => 20],
-        ['label' => 'Pemasaran',   'nilai' => $umkm->skor_pemasaran,   'maks' => 20],
-        ['label' => 'Keuangan',    'nilai' => $umkm->skor_keuangan,    'maks' => 15],
-    ];
+    $skor = \App\Services\UmkmScoringService::rincian($umkm);
 
     $warnaKlasifikasi = [
         'unggulan'   => 'bg-green-100 text-green-800',
@@ -44,7 +40,7 @@
         'Sertifikasi produk' => $nilai['sertifikasi_produk'],
         'Pencatatan keuangan'=> $nilai['metode_pencatatan'],
         'Pembiayaan 2026'    => $nilai['pembiayaan_2026'],
-        'Program BI yang pernah diikuti' => $nilai['program_bi'],
+        "Program yang pernah diikuti dari {$lembaga['program']}" => $nilai['program_bi'],
         'OPD pembina'        => $umkm->opd?->nama_opd,
     ];
 @endphp
@@ -71,11 +67,20 @@
                 <p class="text-4xl font-bold">{{ $umkm->skor_total }}<span class="text-lg text-slate-400">/100</span></p>
             </div>
         </div>
+        <p class="relative mt-4 inline-flex flex-wrap items-center gap-x-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold ring-1 ring-white/20">
+            {{ $umkm->teksBinaan() }}
+            <span class="text-white/40" aria-hidden="true">-</span>
+            <span title="Dapat diubah oleh: {{ $umkm->opd?->nama_opd ? "{$umkm->opd->nama_opd} (OPD pembina) & " : '' }}Super Admin">
+                {{ $bolehUbah ? 'Otoritas Edit' : 'Mode lihat saja' }}
+            </span>
+        </p>
         <div class="relative mt-5 flex flex-wrap gap-2 text-sm">
             <a href="{{ route('admin.profil-umkm.index', ['umkm' => $umkm->id]) }}"
-               class="rounded-lg bg-white px-3 py-1.5 font-medium text-navy-900 transition hover:bg-slate-100">Kelola profil</a>
-            <a href="{{ route('admin.produk.upload-foto', ['umkm' => $umkm->id]) }}"
-               class="rounded-lg border border-white/25 px-3 py-1.5 font-medium text-white transition hover:bg-white/10">Foto produk</a>
+               class="rounded-lg bg-white px-3 py-1.5 font-medium text-navy-900 transition hover:bg-slate-100">{{ $bolehUbah ? 'Kelola profil' : 'Lihat profil' }}</a>
+            @if ($bolehUbah) {{-- Otoritas Edit: OPD pembina & Super Admin --}}
+                <a href="{{ route('admin.produk.upload-foto', ['umkm' => $umkm->id]) }}"
+                   class="rounded-lg border border-white/25 px-3 py-1.5 font-medium text-white transition hover:bg-white/10">Foto produk</a>
+            @endif
             @if ($umkm->status === 'aktif')
                 <a href="{{ route('direktori.show', $umkm) }}" target="_blank" rel="noopener"
                    class="rounded-lg border border-white/25 px-3 py-1.5 font-medium text-white transition hover:bg-white/10">Halaman direktori publik</a>
@@ -91,14 +96,16 @@
         {{-- Rekomendasi program --}}
         <section class="self-start rounded-2xl border border-slate-200 bg-white lg:order-2" aria-labelledby="rekomendasi-title">
             <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-                <h2 id="rekomendasi-title" class="font-semibold text-slate-900">Rekomendasi Program KPw BI</h2>
-                <a href="{{ route('admin.profil-umkm.index', ['umkm' => $umkm->id]) }}#bagian-rekomendasi"
-                   class="flex-shrink-0 rounded-md bg-navy-800 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-navy-900">Ubah</a>
+                <h2 id="rekomendasi-title" class="font-semibold text-slate-900">Rekomendasi Program {{ $lembaga['rekomendasi'] }}</h2>
+                @if ($bolehUbah)
+                    <a href="{{ route('admin.profil-umkm.index', ['umkm' => $umkm->id]) }}#bagian-rekomendasi"
+                       class="flex-shrink-0 rounded-md bg-navy-800 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-navy-900">Ubah</a>
+                @endif
             </div>
 
             {{-- Program yang ditetapkan KPw BI (diatur di Kelola Profil UMKM) --}}
             <div class="border-b border-slate-100 bg-navy-900/[0.03] px-5 py-4">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-800">Ditetapkan KPw BI</p>
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-800">Ditetapkan {{ $lembaga['rekomendasi'] }}</p>
                 @if ($programDitetapkan)
                     <ol class="space-y-2">
                         @foreach ($programDitetapkan as $i => $program)
@@ -110,14 +117,16 @@
                     </ol>
                 @else
                     <p class="text-sm italic text-slate-400">Belum ada program yang ditetapkan.
-                        <a href="{{ route('admin.profil-umkm.index', ['umkm' => $umkm->id]) }}#bagian-rekomendasi" class="font-medium not-italic text-navy-700 hover:underline">Tetapkan program</a>.
+                        @if ($bolehUbah)
+                            <a href="{{ route('admin.profil-umkm.index', ['umkm' => $umkm->id]) }}#bagian-rekomendasi" class="font-medium not-italic text-navy-700 hover:underline">Tetapkan program</a>.
+                        @endif
                     </p>
                 @endif
             </div>
 
             <div class="px-5 pb-1 pt-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Usulan otomatis sistem</p>
-                <p class="mt-0.5 text-xs text-slate-500">Disusun dari data profil & skor sebagai bahan pertimbangan tim KPw BI Kalimantan Barat.</p>
+                <p class="mt-0.5 text-xs text-slate-500">Disusun dari data profil & skor sebagai bahan pertimbangan tim {{ $lembaga['rekomendasi'] === 'KPw BI' ? 'KPw BI Kalimantan Barat' : $lembaga['rekomendasi'] }}.</p>
             </div>
             <ol class="divide-y divide-slate-100">
                 @forelse ($rekomendasi as $i => $r)

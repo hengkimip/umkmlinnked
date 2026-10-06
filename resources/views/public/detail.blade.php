@@ -38,7 +38,6 @@
         ['icon' => 'tag',      'label' => 'Sektor',          'nilai' => $umkm->sektor_label],
         $lokasi ? ['icon' => 'map-pin', 'label' => 'Lokasi', 'nilai' => $lokasi] : null,
         $umkm->tahun_berdiri ? ['icon' => 'calendar', 'label' => 'Berdiri sejak', 'nilai' => $umkm->tahun_berdiri] : null,
-        $umkm->jumlah_tenaga_kerja ? ['icon' => 'users', 'label' => 'Tenaga kerja', 'nilai' => $umkm->jumlah_tenaga_kerja . ' orang'] : null,
         $jangkauan ? ['icon' => 'globe', 'label' => 'Jangkauan pasar', 'nilai' => $jangkauan] : null,
     ]);
 
@@ -70,7 +69,7 @@
         . ($utama ? " Produk unggulannya, {$utama->nama_produk}, dapat dipesan langsung kepada pemilik usaha" . ($umkm->wa_link ? ' melalui WhatsApp.' : '.') : '')
     );
 
-    $skor = max(0, min(100, (int) $umkm->skor_total));
+    $gmapsUrl   = $umkm->gmapsUrl();
     $urlHalaman = url()->current();
 @endphp
 
@@ -134,6 +133,17 @@
                              referrerpolicy="no-referrer" data-gallery-img>
                     @else
                         <div class="ib-card__placeholder" aria-hidden="true">{{ $inisial ?: 'U' }}</div>
+                    @endif
+
+                    {{-- Panah geser foto (hanya bila ada lebih dari satu foto) --}}
+                    @if ($fotoUtama && $galeri->count() > 1)
+                        <button type="button" class="ib-gallery__nav ib-gallery__nav--prev" data-gallery-prev aria-label="Foto sebelumnya">
+                            <x-public.icon name="chevron-left" :size="22" />
+                        </button>
+                        <button type="button" class="ib-gallery__nav ib-gallery__nav--next" data-gallery-next aria-label="Foto berikutnya">
+                            <x-public.icon name="chevron-right" :size="22" />
+                        </button>
+                        <span class="ib-gallery__count" aria-live="polite" data-gallery-count>1 / {{ $galeri->count() }}</span>
                     @endif
                 </div>
 
@@ -270,13 +280,6 @@
                 </p>
             </div>
 
-            @if ($waUtama)
-                <a href="{{ $waUtama }}" class="ib-btn-wa" target="_blank" rel="noopener noreferrer">
-                    @include('public.partials.wa-icon', ['size' => 20])
-                    Pesan via WhatsApp
-                </a>
-            @endif
-
             @if ($kanal)
                 <div>
                     <p class="ib-order__eyebrow" style="margin-bottom:8px">Juga tersedia di</p>
@@ -299,17 +302,16 @@
                 @endif
             </ul>
 
-            @if ($umkm->alamat_usaha && $umkm->alamat_usaha !== '-')
-                <p class="ib-address"><x-public.icon name="map-pin" :size="18" />{{ $umkm->alamat_usaha }}</p>
-            @endif
-
-            <div class="ib-score">
-                <div class="ib-score__head">
-                    <span>Skor kesiapan usaha</span>
-                    <strong>{{ $skor }}<span style="color:var(--muted);font-weight:500">/100</span></strong>
+            @if ($gmapsUrl)
+                <div>
+                    <p class="ib-address"><x-public.icon name="map-pin" :size="18" />{{ $umkm->alamat_usaha }}</p>
+                    <a href="{{ $gmapsUrl }}" class="ib-btn ib-btn--ghost ib-btn--block" style="margin-top:12px"
+                       target="_blank" rel="noopener noreferrer" aria-label="Buka alamat {{ $umkm->nama_usaha }} di Google Maps">
+                        <x-public.icon name="map" :size="18" />
+                        Buka di Google Maps
+                    </a>
                 </div>
-                <div class="ib-score__bar" role="img" aria-label="Skor {{ $skor }} dari 100"><span style="width:{{ $skor }}%"></span></div>
-            </div>
+            @endif
 
             <div class="ib-share">
                 <button type="button" class="ib-btn ib-btn--ghost" data-share data-share-title="{{ $umkm->nama_usaha }}" data-share-url="{{ $urlHalaman }}">

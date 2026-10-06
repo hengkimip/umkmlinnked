@@ -60,7 +60,7 @@ class AdminAccessTest extends TestCase
 
     public function test_guest_is_redirected_from_admin_pages(): void
     {
-        foreach (['/admin/dashboard', '/admin/import', '/admin/produk/upload-foto', '/superadmin/peta-interaktif', '/superadmin/peta-interaktif/data'] as $url) {
+        foreach (['/admin/dashboard', '/superadmin/dashboard', '/admin/import', '/admin/produk/upload-foto', '/peta-interaktif/umkm/1'] as $url) {
             $this->get($url)->assertRedirect('/login');
         }
     }
@@ -71,13 +71,18 @@ class AdminAccessTest extends TestCase
         $this->post('/admin/produk/upload-foto')->assertRedirect('/login');
     }
 
-    public function test_peta_interaktif_is_super_admin_only(): void
+    public function test_peta_interaktif_is_open_but_umkm_detail_needs_admin_role(): void
     {
-        $this->actingAs($this->adminOpd())->get('/superadmin/peta-interaktif')->assertForbidden();
-        $this->actingAs($this->adminOpd())->get('/superadmin/peta-interaktif/data')->assertForbidden();
+        // Peta & datanya terbuka untuk semua (tamu, Admin OPD, Super Admin)
+        $this->get('/peta-interaktif')->assertOk();
+        $this->getJson('/peta-interaktif/data')->assertOk();
+        $this->actingAs($this->adminOpd())->get('/peta-interaktif')->assertOk();
+        $this->actingAs($this->superAdmin())->getJson('/peta-interaktif/data')->assertOk();
 
-        $this->actingAs($this->superAdmin())->get('/superadmin/peta-interaktif')->assertOk();
-        $this->actingAs($this->superAdmin())->getJson('/superadmin/peta-interaktif/data')->assertOk();
+        // Detail UMKM: tamu → login, akun tanpa peran → 403 (cakupan OPD dicek di PetaInteraktifTest)
+        auth()->logout();
+        $this->get('/peta-interaktif/umkm/1')->assertRedirect('/login');
+        $this->actingAs(User::factory()->create())->get('/peta-interaktif/umkm/1')->assertForbidden();
     }
 
     public function test_user_without_role_is_forbidden(): void
@@ -88,10 +93,21 @@ class AdminAccessTest extends TestCase
     public function test_admin_pages_render_for_both_roles(): void
     {
         foreach ([$this->superAdmin(), $this->adminOpd()] as $user) {
-            $this->actingAs($user)->get('/admin/dashboard')->assertOk();
+            $this->actingAs($user)->get($user->dashboardUrl())->assertOk()->assertSee('Dashboard');
             $this->actingAs($user)->get('/admin/import')->assertOk()->assertSee('Unggah file');
             $this->actingAs($user)->get('/admin/produk/upload-foto')->assertOk();
         }
+    }
+
+    public function test_sidebar_has_peta_interaktif_above_dashboard_for_both_roles(): void
+    {
+        $peta = 'href="' . route('superadmin.peta-interaktif') . '"';
+
+        $this->actingAs($this->adminOpd())->get('/admin/dashboard')->assertOk()
+            ->assertSeeInOrder([$peta, 'Peta Interaktif', 'href="' . route('admin.dashboard') . '"', 'Dashboard'], false);
+
+        $this->actingAs($this->superAdmin())->get('/superadmin/dashboard')->assertOk()
+            ->assertSeeInOrder([$peta, 'Peta Interaktif', 'href="' . route('superadmin.dashboard') . '"', 'Dashboard'], false);
     }
 
     public function test_dashboard_only_shows_own_opd_for_admin_opd(): void
@@ -103,9 +119,23 @@ class AdminAccessTest extends TestCase
             ->assertSee('UMKM A')
             ->assertDontSee('UMKM B');
 
-        $this->actingAs($this->superAdmin())->get('/admin/dashboard')
+        $this->actingAs($this->superAdmin())->get('/superadmin/dashboard')
             ->assertSee('UMKM A')
             ->assertSee('UMKM B');
+    }
+
+    public function test_super_admin_dashboard_moved_to_superadmin_url(): void
+    {
+        $super = $this->superAdmin();
+        $this->assertSame('/superadmin/dashboard', $super->dashboardUrl());
+        $this->assertSame('/admin/dashboard', $this->adminOpd()->dashboardUrl());
+
+        // Alamat lama Super Admin dialihkan; Admin OPD tetap di /admin/dashboard
+        $this->actingAs($super)->get('/admin/dashboard')->assertRedirect('/superadmin/dashboard');
+        $this->actingAs($super)->get('/superadmin/dashboard')->assertOk()
+            ->assertSee('href="' . route('superadmin.dashboard') . '"', false); // menu Dashboard ikut alamat baru
+        $this->actingAs($this->adminOpd())->get('/admin/dashboard')->assertOk();
+        $this->actingAs($this->adminOpd())->get('/superadmin/dashboard')->assertForbidden();
     }
 
     public function test_admin_opd_cannot_upload_photo_outside_region(): void

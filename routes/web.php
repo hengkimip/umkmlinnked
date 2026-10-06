@@ -13,6 +13,8 @@ use App\Http\Controllers\Public\GoGlobalController;
 use App\Http\Controllers\Admin\ProdukFotoController;
 use App\Http\Controllers\Admin\ProfilUmkmController;
 use App\Http\Controllers\Admin\BiMapController;
+use App\Http\Controllers\Admin\DuplikatController;
+use App\Http\Controllers\Admin\AksesController;
 use App\Http\Controllers\ProfileController;
 
 // ==================== PUBLIK (tanpa login) ====================
@@ -68,7 +70,10 @@ Route::middleware(['auth', 'verified', 'role:super-admin|admin-opd'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('/dashboard', fn () => view('admin.dashboard'))->name('dashboard');
+        // Dashboard Admin OPD. Super Admin memakai /superadmin/dashboard (alamat lama dialihkan)
+        Route::get('/dashboard', fn (Request $request) => $request->user()->isSuperAdmin()
+            ? redirect()->route('superadmin.dashboard')
+            : view('admin.dashboard'))->name('dashboard');
 
         // Import Excel (FR-15) — Admin OPD dibatasi wilayahnya di controller
         Route::get('/import', [ImportController::class, 'index'])->name('import.index');
@@ -76,6 +81,10 @@ Route::middleware(['auth', 'verified', 'role:super-admin|admin-opd'])
             ->middleware('throttle:10,1')
             ->name('import.store');
         Route::get('/import/template', [ImportController::class, 'template'])->name('import.template');
+        // Tambah satu UMKM secara manual (kolom sama dengan Kelola Profil UMKM)
+        Route::post('/import/manual', [ImportController::class, 'manual'])
+            ->middleware('throttle:30,1')
+            ->name('import.manual');
 
         // Upload foto produk — Admin OPD hanya UMKM binaannya (FR-02)
         Route::get('/produk/upload-foto', [ProdukFotoController::class, 'index'])->name('produk.upload-foto');
@@ -99,6 +108,17 @@ Route::middleware(['auth', 'verified', 'role:super-admin|admin-opd'])
         Route::patch('/profil-umkm/{umkm:id}', [ProfilUmkmController::class, 'update'])
             ->middleware('throttle:120,1')
             ->name('profil-umkm.update');
+        // Antrean review kemungkinan duplikat (import & tambah manual)
+        Route::get('/duplikat', [DuplikatController::class, 'index'])->name('duplikat.index');
+        Route::middleware('throttle:60,1')->whereNumber('duplikat')->group(function () {
+            Route::post('/duplikat/{duplikat}/sama', [DuplikatController::class, 'sama'])->name('duplikat.sama');
+            Route::post('/duplikat/{duplikat}/berbeda', [DuplikatController::class, 'berbeda'])->name('duplikat.berbeda');
+            Route::delete('/duplikat/{duplikat}', [DuplikatController::class, 'hapus'])->name('duplikat.hapus');
+        });
+
+        Route::delete('/profil-umkm/{umkm:id}', [ProfilUmkmController::class, 'destroy'])
+            ->middleware('throttle:30,1')
+            ->name('profil-umkm.destroy');
     });
 
 // ==================== SUPER ADMIN ====================
@@ -107,15 +127,43 @@ Route::middleware(['auth', 'verified', 'role:super-admin'])
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
-        // Peta interaktif (FR-08)
-        Route::get('/peta-interaktif', [BiMapController::class, 'index'])->name('peta-interaktif');
-        Route::get('/peta-interaktif/data', [BiMapController::class, 'dataJson'])->name('peta-interaktif.data');
-        Route::get('/peta-interaktif/umkm/{umkm:id}', [BiMapController::class, 'show'])->name('peta-interaktif.umkm');
+        // Dashboard Super Admin (isi sama, cakupan seluruh OPD — lihat view admin.dashboard)
+        Route::get('/dashboard', fn () => view('admin.dashboard'))->name('dashboard');
+
+        // Kelola Akses: akses OPD, batas admin per OPD, akun Super Admin (kuota BI)
+        Route::get('/akses', [AksesController::class, 'index'])->name('akses.index');
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/akses/opd', [AksesController::class, 'tambahOpd'])->name('akses.opd.store');
+            Route::patch('/akses/opd/{opd}', [AksesController::class, 'ubahOpd'])->whereNumber('opd')->name('akses.opd.update');
+            Route::delete('/akses/opd/{opd}', [AksesController::class, 'hapusOpd'])->whereNumber('opd')->name('akses.opd.destroy');
+            Route::post('/akses/pengguna', [AksesController::class, 'tambahPengguna'])->name('akses.pengguna.store');
+            Route::patch('/akses/pengguna/{user}', [AksesController::class, 'ubahPengguna'])->whereNumber('user')->name('akses.pengguna.update');
+            Route::patch('/akses/pengguna/{user}/opd', [AksesController::class, 'pindahOpd'])->whereNumber('user')->name('akses.pengguna.opd');
+            Route::delete('/akses/pengguna/{user}', [AksesController::class, 'hapusPengguna'])->whereNumber('user')->name('akses.pengguna.destroy');
+        });
     });
 
+// Peta interaktif (FR-08) di /peta-interaktif — TERBUKA untuk umum.
+// Pengunjung menerima data publik saja (sama dengan Semua Brand); Super Admin menerima data lengkap.
+// (nama rute "superadmin.*" dipertahankan agar pemanggil route() tidak berubah)
+Route::middleware('throttle:120,1')
+    ->prefix('peta-interaktif')
+    ->name('superadmin.peta-interaktif')
+    ->group(function () {
+        Route::get('/', [BiMapController::class, 'index']);
+        Route::get('/data', [BiMapController::class, 'dataJson'])->name('.data');
+    });
+
+// Detail UMKM + rekomendasi program: Super Admin (semua) & Admin OPD (UMKM binaannya, dicek di controller)
+Route::middleware(['auth', 'verified', 'role:super-admin|admin-opd'])
+    ->get('/peta-interaktif/umkm/{umkm:id}', [BiMapController::class, 'show'])
+    ->name('superadmin.peta-interaktif.umkm');
+
 // Alamat lama peta interaktif → alamat baru (tautan/bookmark lama tetap jalan)
-Route::permanentRedirect('/admin/peta-interaktif', '/superadmin/peta-interaktif');
-Route::get('/admin/peta-interaktif/umkm/{id}', fn (string $id) => redirect("/superadmin/peta-interaktif/umkm/{$id}", 301))
-    ->whereNumber('id');
+foreach (['admin', 'superadmin'] as $lama) {
+    Route::permanentRedirect("/{$lama}/peta-interaktif", '/peta-interaktif');
+    Route::get("/{$lama}/peta-interaktif/umkm/{id}", fn (string $id) => redirect("/peta-interaktif/umkm/{$id}", 301))
+        ->whereNumber('id');
+}
 
 require __DIR__ . '/auth.php';

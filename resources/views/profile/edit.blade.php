@@ -12,11 +12,29 @@
                 <dd class="mt-1 font-semibold text-slate-900">{{ $user->roleLabel() }}</dd>
             </div>
             <div>
-                <dt class="text-xs font-medium uppercase tracking-wide text-slate-400">OPD</dt>
-                <dd class="mt-1 font-semibold text-slate-900">{{ $user->opd?->nama_opd ?? '—' }}</dd>
+                {{-- Super Admin: Bank Indonesia Wilayah Kalimantan Barat · Admin OPD: OPD-nya --}}
+                <dt class="text-xs font-medium uppercase tracking-wide text-slate-400">Instansi</dt>
+                <dd class="mt-1 font-semibold text-slate-900">{{ $user->instansi() ?? '—' }}</dd>
             </div>
+            @if ($user->jabatan)
+                <div>
+                    <dt class="text-xs font-medium uppercase tracking-wide text-slate-400">Jabatan</dt>
+                    <dd class="mt-1 font-semibold text-slate-900">{{ $user->jabatan }}</dd>
+                </div>
+            @endif
         </dl>
-        <p class="mt-4 text-xs text-slate-500">Peran dan OPD diatur oleh Super Admin.</p>
+        <p class="mt-4 text-xs text-slate-500">
+            @if ($user->isSuperAdmin())
+                Akun Super Admin dikelola {{ config('umkm.instansi_super_admin') }}
+                (maksimal {{ \App\Models\User::maksSuperAdmin() }} orang) lewat menu
+                <a href="{{ route('superadmin.akses.index') }}" class="font-medium text-navy-700 underline">Kelola Akses</a>.
+            @else
+                Peran, instansi, dan akses akun diatur oleh Super Admin ({{ config('umkm.instansi_super_admin') }}).
+                @if ($user->opd)
+                    Nama instansi ini tampil sebagai pembina — <strong>"Binaan {{ $user->opd->nama_opd }}"</strong> — pada UMKM yang Anda masukkan.
+                @endif
+            @endif
+        </p>
     </div>
 
     <div class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">

@@ -1559,6 +1559,54 @@ a.ib-page-btn:hover {
     display: block;
     filter: drop-shadow(0 18px 30px rgba(10, 31, 61, 0.35));
 }
+/* Panah geser foto di kiri & kanan foto utama */
+.ib-gallery__nav {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--navy-900);
+    box-shadow: 0 4px 14px rgba(10, 31, 61, 0.25);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: background 0.15s, transform 0.15s;
+}
+.ib-gallery__nav:hover {
+    background: #fff;
+}
+.ib-gallery__nav:active {
+    transform: translateY(-50%) scale(0.92);
+}
+.ib-gallery__nav:focus-visible {
+    outline: 3px solid var(--gold-500);
+    outline-offset: 2px;
+}
+.ib-gallery__nav--prev {
+    left: 12px;
+}
+.ib-gallery__nav--next {
+    right: 12px;
+}
+.ib-gallery__count {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(10, 31, 61, 0.65);
+    color: #fff;
+    font-size: var(--fs-12, 0.75rem);
+    font-weight: 600;
+}
 .ib-gallery__stage .ib-card__placeholder {
     font-size: clamp(3rem, 2rem + 4vw, 4rem);
 }

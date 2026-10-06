@@ -32,21 +32,14 @@ class GoGlobalController extends Controller
             });
         }
 
-        foreach (['sektor', 'kabupaten', 'klasifikasi'] as $kolom) {
+        foreach (['kabupaten', 'klasifikasi'] as $kolom) {
             if (isset($f[$kolom])) {
                 $query->where($kolom, $f[$kolom]);
             }
         }
 
-        if (isset($f['jangkauan'])) {
-            $query->whereHas('pemasaran', fn($p) => $p->where('jangkauan_pasar', $f['jangkauan']));
-        }
-
-        // Kolom dipetakan dari nilai whitelist, bukan dari input mentah
-        if (isset($f['sertifikasi'])) {
-            $kolomSert = 'nomor_' . $f['sertifikasi'];
-            $query->whereHas('legalitas', fn ($l) => $l->whereNotNull($kolomSert));
-        }
+        // Sektor, jangkauan pasar & sertifikasi: pencocokan sama dengan Semua Brand dan Peta Interaktif
+        FilterUmkm::terapkanTag($query, $f);
 
         $umkm = $query->orderByDesc('skor_total')
                       ->paginate(12)

@@ -25,76 +25,111 @@
     @vite(['resources/css/peta-tailwind.css', 'resources/css/bi-map.css', 'resources/js/bi-map.js'])
 </head>
 
-<body x-data="umkmApp()" @load="init()" x-cloak class="h-screen flex flex-col overflow-hidden bg-gray-50">
+<body x-data="umkmApp()" @load="init()" x-cloak class="h-screen supports-[height:100dvh]:h-dvh flex flex-col overflow-hidden bg-gray-50">
 
     {{-- ==================== HEADER ==================== --}}
-    <header class="bg-white border-b border-slate-200 px-6 py-3">
-        <div class="flex items-center justify-between gap-6">
-            
-            {{-- LEFT: LOGO --}}
-            <div class="flex items-center gap-3 min-w-max">
-                <a href="{{ route('admin.dashboard') }}" title="Ke dashboard admin">
-                    <picture>
-                        <source srcset="{{ asset('logo-umkmlinked.webp') }}" type="image/webp">
-                        <img src="{{ asset('logo-umkmlinked.png') }}" alt="UMKMLinked" width="480" height="147" class="h-10 w-auto">
-                    </picture>
-                </a>
-            </div>
+    {{-- Desktop (lg+): satu baris — logo · cari · wilayah · 4 filter · reset · semua brand · akun.
+         HP/tablet: baris 1 logo · cari · tombol Filter · akun; baris 2 (dibuka tombol Filter) berisi filter. --}}
+    <header class="relative z-[1100] bg-white border-b border-slate-200 px-3 py-2 sm:px-4 sm:py-3">
+        <div class="flex flex-wrap items-center gap-2 lg:flex-nowrap">
 
-            {{-- CENTER: SEARCH & FILTERS --}}
-            <div class="flex-1 flex gap-3 items-center">
-                <input x-model="searchQuery" type="text" placeholder="Cari wilayah atau nama UMKM..." 
-                    class="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-0">
-                
+            {{-- LOGO --}}
+            <a href="{{ $dashboardUrl ?? route('home') }}" title="{{ $dashboardUrl ? 'Ke dashboard admin' : 'Ke beranda' }}" class="mr-1 flex-shrink-0">
+                <picture>
+                    <source srcset="{{ asset('logo-umkmlinked.webp') }}" type="image/webp">
+                    <img src="{{ asset('logo-umkmlinked.png') }}" alt="UMKMLinked" width="480" height="147" class="h-7 w-auto sm:h-9">
+                </picture>
+            </a>
+
+            {{-- SEARCH --}}
+            <input x-model="searchQuery" type="search" placeholder="Cari wilayah atau nama UMKM..." aria-label="Cari wilayah atau nama UMKM"
+                class="flex-1 min-w-0 lg:min-w-[8rem] px-3 py-2 border border-slate-200 rounded-lg text-[13px] focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+
+            {{-- TOMBOL FILTER (HP/tablet saja) --}}
+            <button type="button" @click="filterBuka = !filterBuka" :aria-expanded="filterBuka" aria-controls="filter-bar"
+                    :class="filterBuka || jumlahFilterAktif || selectedKabupaten ? 'border-[#003066] bg-blue-50 text-[#003066]' : 'border-slate-200 bg-white text-slate-700'"
+                    class="lg:hidden flex flex-shrink-0 items-center gap-1.5 px-3 py-2 border rounded-lg text-[13px] font-bold">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"/>
+                </svg>
+                <span class="hidden sm:inline">Filter</span>
+                <span x-show="jumlahFilterAktif + (selectedKabupaten ? 1 : 0)" x-text="jumlahFilterAktif + (selectedKabupaten ? 1 : 0)"
+                      class="min-w-5 rounded-full bg-[#003066] px-1.5 text-center text-[11px] text-white"></span>
+            </button>
+
+            {{-- BARIS FILTER: selalu tampil di desktop; di HP/tablet dibuka lewat tombol Filter --}}
+            <div id="filter-bar" :class="filterBuka ? 'flex' : 'hidden lg:flex'"
+                 class="order-last w-full flex-wrap items-center gap-2 lg:order-none lg:w-auto lg:flex-nowrap">
+
                 {{-- WILAYAH DROPDOWN --}}
-                <select x-model="selectedKabupaten" class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-white hover:border-slate-300 cursor-pointer min-w-max">
+                <select x-model="selectedKabupaten" aria-label="Wilayah"
+                        class="flex-shrink-0 px-3 py-2 border border-slate-200 rounded-lg text-[13px] font-bold text-slate-700 bg-white hover:border-slate-300 cursor-pointer">
                     <option value="">Wilayah</option>
                     <template x-for="kab in kabupatens" :key="kab">
                         <option :value="kab" x-text="kab"></option>
                     </template>
                 </select>
 
-                {{-- KATEGORI UMKM (sektor dari database) --}}
-                <select x-model="selectedSektor" aria-label="Kategori UMKM"
-                        class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-white hover:border-slate-300 cursor-pointer min-w-max">
-                    <option value="">Semua Kategori</option>
-                    <template x-for="s in sektorList" :key="s.kode">
-                        <option :value="s.kode" x-text="s.label + ' (' + s.jumlah + ')'"></option>
-                    </template>
-                </select>
+                {{-- SEKTOR / PLATFORM / JANGKAUAN / SERTIFIKASI (kotak centang) --}}
+                @foreach ($filterPeta as $grup => $def)
+                    <div x-data="{ buka: false }" @click.outside="buka = false" @keydown.escape="buka = false" class="relative flex-shrink-0">
+                        <button type="button" @click="buka = !buka" :aria-expanded="buka"
+                                :class="filter.{{ $grup }}.length ? 'border-[#003066] bg-blue-50 text-[#003066]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'"
+                                class="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-[13px] font-bold whitespace-nowrap transition-all">
+                            {{ $def['judul'] }}
+                            <span x-show="filter.{{ $grup }}.length" x-text="filter.{{ $grup }}.length"
+                                  class="min-w-5 rounded-full bg-[#003066] px-1.5 text-center text-[11px] text-white"></span>
+                            <svg class="w-4 h-4 transition-transform" :class="buka && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="buka" x-transition.opacity x-cloak
+                             class="fixed inset-x-3 mt-1 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-xl sm:absolute sm:inset-x-auto {{ $loop->last ? 'sm:right-0' : 'sm:left-0' }} sm:top-full sm:w-72 sm:max-h-none sm:overflow-visible">
+                            @foreach ($def['opsi'] as $kode => $label)
+                                <label class="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                                    <input type="checkbox" value="{{ $kode }}" x-model="filter.{{ $grup }}"
+                                           class="h-4 w-4 rounded border-slate-300 accent-[#003066]">
+                                    <span class="flex-1">{{ $label }}</span>
+                                    <span class="text-xs font-bold text-slate-400" x-text="hitungOpsi.{{ $grup }}?.{{ $kode }} ?? 0"></span>
+                                </label>
+                            @endforeach
+                            <button type="button" x-show="filter.{{ $grup }}.length" @click="filter.{{ $grup }} = []"
+                                    class="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs font-bold text-blue-700 hover:bg-blue-50">
+                                Hapus pilihan
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
 
                 {{-- RESET BUTTON --}}
-                <button @click="resetMap()" class="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-all whitespace-nowrap">
+                <button @click="resetMap()" class="flex-shrink-0 px-3 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-all whitespace-nowrap">
                     Reset
                 </button>
 
-                {{-- LANGUAGE FLAG --}}
-                <div class="flex items-center gap-2 px-3 py-2 border-l border-slate-200 min-w-max">
-                    <img src="https://flagcdn.com/id.svg" alt="ID" class="w-5 h-3 rounded">
-                    <span class="text-sm font-bold text-slate-700 hidden sm:block">ID</span>
-                </div>
+                {{-- SEMUA BRAND (halaman publik, di tab yang sama) --}}
+                <a href="{{ route('direktori.index') }}"
+                   class="flex-shrink-0 px-3 py-2 bg-[#003066] text-white rounded-lg text-[13px] font-bold hover:bg-[#002550] transition-all whitespace-nowrap">
+                    Semua Brand
+                </a>
             </div>
 
-            {{-- RIGHT: USER INFO --}}
-            <div class="hidden sm:flex items-center gap-3 min-w-max">
-                <a href="{{ route('admin.dashboard') }}"
-                   class="px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-all whitespace-nowrap">
-                    Panel Admin
+            {{-- KELUAR (sudah login) / LOGIN ADMIN (pengunjung) --}}
+            @guest
+                <a href="{{ route('login') }}"
+                   class="flex-shrink-0 px-3 py-2 border border-slate-200 rounded-lg text-[13px] font-bold text-slate-700 hover:bg-slate-100 transition-all whitespace-nowrap">
+                    Login<span class="hidden sm:inline"> Admin</span>
                 </a>
-                <div class="flex flex-col items-end">
-                    <span class="text-xs font-bold text-slate-800">{{ auth()->user()->name }}</span>
-                    <span class="text-[9px] text-green-600 font-black uppercase">{{ auth()->user()->roleLabel() }}</span>
-                </div>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" title="Keluar" aria-label="Keluar"
-                        class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
-                        </svg>
-                    </button>
-                </form>
-            </div>
+            @else
+            <form method="POST" action="{{ route('logout') }}" class="flex-shrink-0">
+                @csrf
+                <button type="submit" title="Keluar" aria-label="Keluar"
+                    class="w-9 h-9 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 text-blue-700 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
+                    </svg>
+                </button>
+            </form>
+            @endguest
         </div>
     </header>
 
@@ -102,25 +137,31 @@
     <div class="flex flex-1 overflow-hidden relative">
 
         {{-- ==================== SIDEBAR ==================== --}}
-        <aside :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'" class="transition-all duration-300 bg-white border-r border-slate-200 flex flex-col overflow-hidden shadow-sm">
+        {{-- Desktop: di samping peta. HP/tablet: panel melayang di atas peta (maks 20rem / 85% layar) --}}
+        <aside :class="sidebarCollapsed ? 'w-0 opacity-0' : 'w-[min(20rem,85vw)] lg:w-80 opacity-100'"
+               class="absolute inset-y-0 left-0 z-[1002] lg:relative lg:z-auto h-full flex-shrink-0 transition-all duration-300 bg-white border-r border-slate-200 flex flex-col overflow-hidden shadow-xl lg:shadow-sm">
             
             {{-- TAB NAVIGATION --}}
             <nav class="flex-shrink-0 p-4 pb-2 flex gap-2 border-b border-slate-100">
-                <button @click="activeTab = 'dashboard'"
-                    :class="activeTab === 'dashboard' ? 'bg-[#003066] text-white' : 'text-slate-500 hover:bg-slate-50'"
-                    class="flex-1 px-3 py-3 rounded-lg transition-all font-bold text-xs uppercase">
+                @if ($dashboardUrl) {{-- khusus Super Admin & Admin OPD yang login --}}
+                <a href="{{ $dashboardUrl }}" title="Buka dashboard admin"
+                   class="flex flex-1 items-center justify-center gap-1 px-3 py-3 rounded-lg transition-all font-bold text-xs uppercase text-slate-500 hover:bg-slate-50 hover:text-[#003066]">
                     Dashboard
-                </button>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                </a>
+                @endif
                 <button @click="activeTab = 'database'"
                     :class="activeTab === 'database' ? 'bg-[#003066] text-white' : 'text-slate-500 hover:bg-slate-50'"
                     class="flex-1 px-3 py-3 rounded-lg transition-all font-bold text-xs uppercase">
                     Database
                 </button>
+                @if ($lengkap) {{-- program BI = jawaban kuesioner, khusus Super Admin --}}
                 <button @click="activeTab = 'program'"
                     :class="activeTab === 'program' ? 'bg-[#003066] text-white' : 'text-slate-500 hover:bg-slate-50'"
                     class="flex-1 px-3 py-3 rounded-lg transition-all font-bold text-xs uppercase">
                     Program
                 </button>
+                @endif
             </nav>
 
             {{-- CONTENT AREA --}}
@@ -135,94 +176,31 @@
                 <div x-show="!isLoading && loadError" x-cloak role="alert"
                      class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700" x-text="loadError"></div>
 
+                @if ($lengkap)
                 <div x-show="!isLoading && tidakDiketahui > 0" x-cloak
                      class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                     <p class="font-bold" x-text="tidakDiketahui + ' UMKM belum memiliki kabupaten/kota'"></p>
                     <p class="mt-1">Tidak tampil pada label peta. Cantumkan nama kabupaten/kota pada alamat usaha di
                         <a href="{{ route('admin.profil-umkm.index') }}" class="font-bold underline">Kelola Profil UMKM</a>.</p>
                 </div>
+                @endif
 
                 <template x-if="!isLoading">
                     <div>
-                        {{-- ==================== TAB 1: DASHBOARD ==================== --}}
-                        <div x-show="activeTab === 'dashboard'" class="space-y-5">
-                            
-                            {{-- WELCOME TEXT / STATUS WILAYAH --}}
-                            <template x-if="!selectedCity">
-                                {{-- WELCOME VIEW --}}
-                                <div class="space-y-5">
-                                    <div class="text-center mb-6">
-                                        <h2 class="text-2xl font-black text-[#003066] mb-2">UMKMLinked</h2>
-                                        <p class="text-xs text-slate-500 uppercase font-bold tracking-widest">Platform Strategis UMKM Kalimantan Barat</p>
-                                    </div>
-
-                                    <div class="space-y-4 text-sm text-slate-700 leading-relaxed">
-                                        <p><span class="font-bold text-[#003066]">Kalimantan Barat</span> bukan sekadar wilayah dengan ribuan pelaku usaha, tetapi ruang tumbuh bagi keberagaman produk, kreativitas, dan potensi UMKM. Dari pangan, kerajinan, fesyen, hingga usaha berbasis potensi daerah, setiap UMKM membawa cerita, keterampilan, dan potensi ekonomi lokal.</p>
-
-                                        <p>Untuk menghubungkan potensi tersebut dengan peluang pengembangan yang lebih luas, hadir <span class="font-bold text-[#003066]">UMKMLINKED</span>, platform digital yang dirancang untuk memetakan, mengelola, dan memperkuat ekosistem UMKM Kalimantan Barat.</p>
-
-                                        <p><span class="font-bold text-blue-600">UMKMLINKED</span> menghadirkan data UMKM yang terintegrasi, mulai dari profil pelaku usaha, produk, lokasi, legalitas, kapasitas produksi, pemasaran, hingga perkembangan usaha. Melalui data yang terstruktur, setiap UMKM dapat dipahami berdasarkan karakteristik, potensi, tingkat perkembangan, serta kebutuhan pengembangannya.</p>
-
-                                        <p>Lebih dari sekadar direktori, <span class="font-bold text-blue-600">UMKMLINKED</span> menjadi ruang penghubung antara data, potensi, program, dan peluang kolaborasi. Platform ini membantu pemangku kepentingan memahami kondisi UMKM di berbagai kabupaten dan kota, sekaligus membuka ruang keterhubungan antara pelaku usaha, pemerintah, pendamping, dan mitra.</p>
-
-                                        <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-                                            <p class="font-bold text-blue-900 text-sm italic">
-                                                "Dari data menjadi wawasan, dari wawasan menjadi peluang, dan dari peluang menjadi kolaborasi untuk UMKM Kalimantan Barat."
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {{-- CTA --}}
-                                    <div class="bg-[#003066] text-white p-4 rounded-lg text-center">
-                                        <p class="text-xs font-bold uppercase mb-2">Mulai Eksplorasi</p>
-                                        <p class="text-sm">Klik label kota/kabupaten pada peta untuk memunculkan cabang UMKM, lalu klik nama UMKM untuk detail &amp; rekomendasi program KPw BI.</p>
-                                    </div>
-
-                                    {{-- STATS --}}
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg text-center border border-blue-200">
-                                            <p class="text-2xl font-black text-[#003066]" x-text="databaseUMKM.length"></p>
-                                            <p class="text-xs font-bold text-slate-600">Total UMKM</p>
-                                        </div>
-                                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg text-center border border-green-200">
-                                            <p class="text-2xl font-black text-green-700" x-text="kabupatens.length"></p>
-                                            <p class="text-xs font-bold text-slate-600">Kabupaten/Kota</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-
-                            {{-- CITY SELECTED VIEW --}}
-                            <template x-if="selectedCity">
-                                <div class="space-y-5">
-                                    <h2 class="text-lg font-black text-slate-900">Status Wilayah</h2>
-                                    
-                                    <div class="bg-[#003066] p-5 rounded-2xl text-white shadow-lg space-y-4">
-                                        <div>
-                                            <p class="text-xs text-blue-300 font-bold uppercase mb-1">Kabupaten/Kota</p>
-                                            <h3 class="text-lg font-black" x-text="selectedCity.name"></h3>
-                                        </div>
-                                        <div class="grid grid-cols-3 gap-2">
-                                            <div class="bg-white/10 p-3 rounded-lg text-center">
-                                                <p class="text-[8px] font-bold opacity-70 mb-1">DASAR</p>
-                                                <p class="text-xl font-black" x-text="currentStats.dasar || 0"></p>
-                                            </div>
-                                            <div class="bg-white/10 p-3 rounded-lg text-center">
-                                                <p class="text-[8px] font-bold opacity-70 mb-1">KEMBANG</p>
-                                                <p class="text-xl font-black" x-text="currentStats.berkembang || 0"></p>
-                                            </div>
-                                            <div class="bg-white/10 p-3 rounded-lg text-center">
-                                                <p class="text-[8px] font-bold opacity-70 mb-1">UNGGUL</p>
-                                                <p class="text-xl font-black" x-text="currentStats.unggulan || 0"></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-
                         {{-- ==================== TAB 2: DATABASE UMKM ==================== --}}
                         <div x-show="activeTab === 'database'" class="space-y-4">
+                            {{-- Saat masuk / Reset (belum ada pilihan) tampil teks sambutan --}}
+                            <template x-if="tampilSambutan">
+                                <div class="space-y-5">
+                                    @include('admin.bi-map._sambutan', ['untukAdmin' => $lengkap])
+                                    <button type="button" @click="lihatDaftar = true"
+                                            class="w-full rounded-lg border-2 border-[#003066] px-4 py-2.5 text-sm font-bold text-[#003066] transition-all hover:bg-blue-50">
+                                        Lihat daftar semua UMKM
+                                    </button>
+                                </div>
+                            </template>
+
+                            <div x-show="!tampilSambutan" class="space-y-4">
                             <h2 class="text-lg font-black text-slate-900">Daftar UMKM</h2>
                             
                             {{-- FILTER INFO --}}
@@ -234,22 +212,38 @@
                                     <p class="text-xs text-blue-200" x-text="'Ibu kota: ' + selectedCity.ibukota"></p>
                                     <p class="mt-2 inline-block rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold"
                                        x-text="filteredTable.length + ' UMKM dari database'"></p>
+                                    <div class="mt-3 grid grid-cols-3 gap-2">
+                                        <div class="bg-white/10 p-2 rounded-lg text-center">
+                                            <p class="text-[8px] font-bold opacity-70">DASAR</p>
+                                            <p class="text-lg font-black" x-text="currentStats.dasar || 0"></p>
+                                        </div>
+                                        <div class="bg-white/10 p-2 rounded-lg text-center">
+                                            <p class="text-[8px] font-bold opacity-70">BERKEMBANG</p>
+                                            <p class="text-lg font-black" x-text="currentStats.berkembang || 0"></p>
+                                        </div>
+                                        <div class="bg-white/10 p-2 rounded-lg text-center">
+                                            <p class="text-[8px] font-bold opacity-70">UNGGULAN</p>
+                                            <p class="text-lg font-black" x-text="currentStats.unggulan || 0"></p>
+                                        </div>
+                                    </div>
                                 </div>
                             </template>
                             <div x-show="!selectedCity" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
                                 <p class="text-xs text-blue-600 font-bold">📊 Filter Aktif:</p>
                                 <div class="text-sm font-black text-blue-900 mt-1">
-                                    <template x-if="!selectedKabupaten && !selectedSektor">
+                                    <template x-if="!selectedKabupaten && !jumlahFilterAktif">
                                         <p>Menampilkan Semua UMKM</p>
                                     </template>
-                                    <template x-if="selectedKabupaten || selectedSektor">
+                                    <template x-if="selectedKabupaten || jumlahFilterAktif">
                                         <div class="space-y-1">
                                             <template x-if="selectedKabupaten">
                                                 <p x-text="'Wilayah: ' + selectedKabupaten"></p>
                                             </template>
-                                            <template x-if="selectedSektor">
-                                                <p x-text="'Kategori: ' + labelSektor"></p>
-                                            </template>
+                                            @foreach ($filterPeta as $grup => $def)
+                                                <template x-if="filter.{{ $grup }}.length">
+                                                    <p x-text="@js($def['judul'] . ': ') + filter.{{ $grup }}.map((k) => @js($def['opsi'])[k]).join(', ')"></p>
+                                                </template>
+                                            @endforeach
                                         </div>
                                     </template>
                                 </div>
@@ -280,7 +274,7 @@
                                         <div class="flex items-start gap-2.5 mb-2">
                                             <span class="flex-shrink-0 w-7 h-7 bg-[#003066] text-white rounded-full flex items-center justify-center text-xs font-bold" x-text="(index + 1)"></span>
                                             <div class="flex-1 min-w-0">
-                                                <a :href="umkm.url" target="_blank" rel="noopener"
+                                                <a :href="umkm.url || umkm.url_publik"
                                                    class="block break-words text-[15px] font-extrabold leading-snug text-[#003066] hover:text-blue-700 hover:underline"
                                                    x-text="umkm.nama"></a>
                                                 <p class="mt-0.5 text-xs font-semibold text-slate-500">
@@ -305,6 +299,27 @@
                                             </div>
                                         </div>
 
+                                        {{-- LOKASI: pin (cari nama jalan di peta) & Google Maps --}}
+                                        <div x-show="umkm.alamat" class="-mt-1 mb-2.5 flex flex-wrap items-center gap-1.5">
+                                            <button type="button" x-show="namaJalan(umkm.alamat)" @click="cariJalan(umkm)"
+                                                    :disabled="cariJalanId !== null"
+                                                    :title="'Cari ' + namaJalan(umkm.alamat) + ' di peta'"
+                                                    class="inline-flex max-w-full items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-bold text-amber-700 transition-all hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60">
+                                                <svg x-show="cariJalanId !== umkm.id" class="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path fill-rule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/>
+                                                </svg>
+                                                <span x-show="cariJalanId === umkm.id" class="h-3 w-3 flex-shrink-0 animate-spin rounded-full border-2 border-amber-200 border-t-amber-600"></span>
+                                                <span class="truncate" x-text="cariJalanId === umkm.id ? 'Mencari…' : namaJalan(umkm.alamat)"></span>
+                                            </button>
+                                            <a :href="gmapUrl(umkm)" target="_blank" rel="noopener noreferrer" title="Buka alamat di Google Maps"
+                                               class="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+                                                <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z"/>
+                                                </svg>
+                                                Google Maps
+                                            </a>
+                                        </div>
+
                                         {{-- CONTACT INFO --}}
                                         <div class="space-y-1 text-xs text-slate-600 mb-2.5 pb-2.5 border-b border-slate-100">
                                             <template x-if="umkm.whatsapp">
@@ -326,22 +341,68 @@
                                             <template x-if="umkm.tahun_berdiri">
                                                 <span class="bg-slate-100 text-slate-700 px-2 py-1 rounded" x-text="'📅 ' + umkm.tahun_berdiri"></span>
                                             </template>
+                                            <template x-if="umkm.skor != null"> {{-- skor: khusus Super Admin --}}
                                             <span :class="{
                                                 'bg-green-100 text-green-700': umkm.skor >= 75,
                                                 'bg-blue-100 text-blue-700': umkm.skor >= 45 && umkm.skor < 75,
                                                 'bg-gray-100 text-gray-700': umkm.skor < 45
                                             }" class="px-2 py-1 rounded" x-text="'⭐ ' + umkm.skor"></span>
+                                            </template>
                                         </div>
                                     </div>
                                 </template>
                             </div>
+                            </div>
                         </div>
 
+                        @if ($lengkap)
                         {{-- ==================== TAB 3: PROGRAM ==================== --}}
                         <div x-show="activeTab === 'program'" class="space-y-4">
-                            <h2 class="text-lg font-black text-slate-900">Program Rekomendasi</h2>
-                            <p class="text-sm text-slate-500 py-8 text-center">Pilih wilayah untuk melihat program yang relevan</p>
+                            <div>
+                                <h2 class="text-lg font-black text-slate-900">Program Rekomendasi</h2>
+                                <p class="mt-1 text-xs text-slate-500">Referensi dari program Bank Indonesia yang pernah dituliskan UMKM pada profilnya.</p>
+                            </div>
+
+                            <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                <p class="text-xs font-bold text-blue-900"
+                                   x-text="(selectedCity ? selectedCity.name : (selectedKabupaten || 'Seluruh Kalimantan Barat')) + (jumlahFilterAktif ? ' · terfilter' : '')"></p>
+                                <p class="mt-1 text-xs font-bold text-blue-500"
+                                   x-text="programReferensi.length + ' program dari ' + filteredDatabase.filter((u) => u.program?.length).length + ' UMKM'"></p>
+                            </div>
+
+                            <template x-if="programReferensi.length === 0">
+                                <div class="rounded-lg border border-dashed border-slate-300 p-4 text-center">
+                                    <p class="text-xs font-bold text-slate-500">Belum ada program yang dituliskan UMKM di cakupan ini.</p>
+                                    <p class="mt-1 text-xs text-slate-400">Isi kolom "Program yang pernah diikuti dari Bank Indonesia" di
+                                        <a href="{{ route('admin.profil-umkm.index') }}" class="font-bold text-blue-600 underline">Kelola Profil UMKM</a> atau lewat import Excel.</p>
+                                </div>
+                            </template>
+
+                            <div class="space-y-2">
+                                <template x-for="p in programReferensi" :key="p.nama">
+                                    <div x-data="{ buka: false }" class="rounded-xl border-2 border-slate-200 bg-white hover:border-blue-300 transition-all">
+                                        <button type="button" @click="buka = !buka" :aria-expanded="buka"
+                                                class="flex w-full items-start gap-2.5 p-3 text-left">
+                                            <span class="flex-1 text-sm font-extrabold leading-snug text-[#003066]" x-text="p.nama"></span>
+                                            <span class="flex-shrink-0 rounded-full bg-[#003066] px-2 py-0.5 text-[10px] font-black text-white"
+                                                  x-text="p.umkm.length + ' UMKM'"></span>
+                                            <svg class="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400 transition-transform" :class="buka && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                        <ul x-show="buka" x-cloak class="space-y-1 border-t border-slate-100 px-3 py-2">
+                                            <template x-for="u in p.umkm" :key="u.id">
+                                                <li class="text-xs">
+                                                    <a :href="u.url" target="_blank" rel="noopener" class="font-semibold text-slate-700 hover:text-blue-700 hover:underline" x-text="u.nama"></a>
+                                                    <span class="text-slate-400" x-text="' · ' + u.kab"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
+                        @endif
                     </div>
                 </template>
 
@@ -355,10 +416,17 @@
 
         </aside>
 
+        {{-- Latar redup (HP/tablet) saat panel terbuka — ketuk untuk menutup --}}
+        <div x-show="!sidebarCollapsed" x-transition.opacity x-cloak @click="toggleSidebar()"
+             class="lg:hidden absolute inset-0 z-[1001] bg-slate-900/30" aria-hidden="true"></div>
+
         {{-- ==================== TOGGLE SIDEBAR BUTTON ==================== --}}
-        <button @click="toggleSidebar()" 
-            :class="sidebarCollapsed ? 'left-0' : 'left-80'"
-            class="toggle-sidebar-btn transition-all duration-300 fixed top-1/2 -translate-y-1/2 z-[999] bg-white border-2 border-slate-200 border-l-0 rounded-r-lg p-2 hover:bg-slate-100 active:scale-95">
+        {{-- Ikut tepi sidebar; saat sidebar ditutup menempel di tepi kiri layar --}}
+        <button type="button" @click="toggleSidebar()"
+            :class="sidebarCollapsed ? 'left-0' : 'left-[min(20rem,85vw)] lg:left-80'"
+            :title="sidebarCollapsed ? 'Buka panel' : 'Tutup panel'" :aria-label="sidebarCollapsed ? 'Buka panel' : 'Tutup panel'"
+            :aria-expanded="!sidebarCollapsed"
+            class="toggle-sidebar-btn transition-all duration-300 fixed top-1/2 -translate-y-1/2 z-[1003] bg-white border-2 border-slate-200 border-l-0 rounded-r-lg p-2 hover:bg-slate-100 active:scale-95">
             <svg class="w-6 h-6 text-[#003066] transition-transform duration-300" :class="sidebarCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
             </svg>
@@ -387,16 +455,21 @@
                 </div>
             </div>
 
+            {{-- PESAN PENCARIAN JALAN --}}
+            <div x-show="pesanPeta" x-transition.opacity x-cloak role="status"
+                 class="absolute left-1/2 top-4 z-[600] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 shadow-lg"
+                 x-text="pesanPeta"></div>
+
             {{-- TOTAL TERDATA --}}
-            <div class="absolute bottom-8 left-6 z-[500]">
+            <div class="absolute bottom-4 left-4 z-[500] sm:bottom-8 sm:left-6">
                 <p class="text-[10px] font-black text-slate-500 uppercase mb-1">Total Terdata</p>
-                <p class="text-3xl font-black text-[#003066]" x-text="databaseUMKM.length"></p>
+                <p class="text-2xl font-black text-[#003066] sm:text-3xl" x-text="databaseUMKM.length"></p>
             </div>
 
             {{-- FOCUS KALBAR --}}
-            <div class="absolute bottom-8 right-6 z-[500]">
-                <button @click="focusKalbar()" 
-                    class="px-6 py-3 bg-[#003066] text-white rounded-lg text-sm font-black uppercase tracking-widest shadow-lg hover:bg-[#002550] active:scale-95 transition-all">
+            <div class="absolute bottom-6 right-3 z-[500] sm:bottom-8 sm:right-6">
+                <button @click="focusKalbar()"
+                    class="px-3 py-2 bg-[#003066] text-white rounded-lg text-xs font-black uppercase tracking-wider shadow-lg hover:bg-[#002550] active:scale-95 transition-all sm:px-6 sm:py-3 sm:text-sm sm:tracking-widest">
                     Focus Kalbar
                 </button>
             </div>
@@ -406,7 +479,7 @@
     </div>
 
     {{-- FOOTER --}}
-    <footer class="bg-white border-t border-slate-200 px-6 py-3 text-xs text-slate-500 flex justify-between">
+    <footer class="hidden sm:flex bg-white border-t border-slate-200 px-6 py-3 text-xs text-slate-500 justify-between">
         <span>© 2026 UMKMLinked - Platform Strategis UMKM Indonesia</span>
         <div class="flex gap-4">
             <a href="#" class="hover:text-slate-700">Privacy</a>

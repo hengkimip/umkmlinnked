@@ -23,7 +23,11 @@ class SecurityTest extends TestCase
     private const RUTE_PUBLIK = [
         '/', 'go-global', 'go-digital', 'semua-brand', 'semua-brand/{umkm}', 'berita', 'berita/{slug}',
         'kemitraan', 'tentang-kami', 'direktori/{slug?}',
-        'admin/peta-interaktif', 'admin/peta-interaktif/umkm/{id}', // hanya pengalihan 301 ke rute ber-auth
+        // hanya pengalihan 301 ke rute ber-auth /peta-interaktif
+        'admin/peta-interaktif', 'admin/peta-interaktif/umkm/{id}',
+        'superadmin/peta-interaktif', 'superadmin/peta-interaktif/umkm/{id}',
+        // peta interaktif terbuka untuk umum (data publik saja; lihat BiMapController::KOLOM_ADMIN)
+        'peta-interaktif', 'peta-interaktif/data',
         'login', 'forgot-password', 'reset-password/{token}', 'reset-password',
         'up', 'storage/{path}',
     ];
@@ -50,7 +54,9 @@ class SecurityTest extends TestCase
     public function test_admin_and_superadmin_routes_also_require_a_role(): void
     {
         foreach (Route::getRoutes() as $route) {
-            if (! preg_match('#^(admin|superadmin)/#', $route->uri()) || str_starts_with($route->uri(), 'admin/peta-interaktif')) {
+            $uri = $route->uri();
+            if (! preg_match('#^(admin/|superadmin/|peta-interaktif/umkm/)#', $uri)
+                || preg_match('#^(admin|superadmin)/peta-interaktif#', $uri)) { // pengalihan 301
                 continue;
             }
             $this->assertTrue(
@@ -66,7 +72,6 @@ class SecurityTest extends TestCase
         $tanpaPeran = User::factory()->create();
 
         $endpoint = [
-            ['GET', '/superadmin/peta-interaktif/data'],
             ['GET', '/admin/produk/list/1'],
             ['PATCH', '/admin/profil-umkm/1'],
             ['PATCH', '/admin/produk/1'],
@@ -104,6 +109,38 @@ class SecurityTest extends TestCase
 
         $cache = $this->actingAs($admin)->get('/admin/dashboard')->headers->get('Cache-Control');
         $this->assertStringContainsString('no-store', $cache);
+    }
+
+    public function test_content_security_policy_limits_sources_on_every_page_type(): void
+    {
+        foreach (['/', '/semua-brand', '/peta-interaktif', '/login', '/halaman-tidak-ada'] as $url) {
+            $csp = (string) $this->get($url)->headers->get('Content-Security-Policy');
+            foreach ([
+                "default-src 'self'", "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com",
+                "connect-src 'self' https://nominatim.openstreetmap.org", "frame-ancestors 'self'",
+                "base-uri 'self'", "form-action 'self'", "object-src 'none'",
+            ] as $aturan) {
+                $this->assertStringContainsString($aturan, $csp, "{$url}: CSP tanpa {$aturan}");
+            }
+        }
+    }
+
+    public function test_private_files_and_secrets_are_not_served(): void
+    {
+        $this->assertFalse(Route::has('storage.local'));
+        $this->assertFalse(collect(Route::getRoutes())->contains(fn ($r) => $r->uri() === 'storage/{path}'));
+
+        foreach (['/.env', '/storage/app/private/x', '/composer.json', '/artisan'] as $url) {
+            $this->get($url)->assertNotFound();
+        }
+    }
+
+    public function test_public_map_data_never_contains_private_fields(): void
+    {
+        $json = $this->getJson('/peta-interaktif/data')->assertOk()->getContent();
+        foreach (['"email"', '"skor"', '"tenaga_kerja"', '"program"', '"opd_id"', '"url":', 'pemilik', 'telepon'] as $kunci) {
+            $this->assertStringNotContainsString($kunci, $json);
+        }
     }
 
     public function test_forgot_password_does_not_reveal_registered_emails(): void

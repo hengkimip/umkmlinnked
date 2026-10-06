@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Umkm;
 use App\Support\CacheData;
 use App\Support\FilterUmkm;
+use App\Support\TagUmkm;
 use Illuminate\Http\Request;
 
 class UmkmController extends Controller
@@ -27,11 +28,14 @@ class UmkmController extends Controller
             });
         }
 
-        foreach (['sektor', 'kabupaten', 'klasifikasi'] as $kolom) {
+        foreach (['kabupaten', 'klasifikasi'] as $kolom) {
             if (isset($f[$kolom])) {
                 $query->where($kolom, $f[$kolom]);
             }
         }
+
+        // Sektor Usaha, Platform Digital, Jangkauan Pasar, Sertifikasi Produk (banyak pilihan; sama dengan peta)
+        FilterUmkm::terapkanTag($query, $f);
 
         if (isset($f['harga_min'])) {
             $query->whereHas('produk', fn($p) => $p->where('harga', '>=', $f['harga_min']));
@@ -45,10 +49,9 @@ class UmkmController extends Controller
                       ->paginate(12)
                       ->withQueryString();
 
-        // Trending, daftar filter & statistik sama untuk semua pengunjung → di-cache
+        // Daftar filter & statistik sama untuk semua pengunjung → di-cache
         // (dibatalkan otomatis saat data UMKM berubah, lihat CacheData)
-        // Cache hanya berisi array/angka; model trending dimuat ulang dari ID-nya
-        ['trending' => $trendingId, 'kabupatenList' => $kabupatenList, 'sektorList' => $sektorList, 'stats' => $stats]
+        ['kabupatenList' => $kabupatenList, 'stats' => $stats]
             = CacheData::ingat('semua-brand:samping', 600, function () {
                 $kosong = Umkm::KABUPATEN_KOSONG;
                 $agg = Umkm::aktif()->toBase()->selectRaw("
@@ -60,11 +63,8 @@ class UmkmController extends Controller
                 ", [$kosong])->first();
 
                 return [
-                    'trending' => Umkm::aktif()->orderByDesc('skor_total')->limit(8)->pluck('id')->all(),
                     'kabupatenList' => Umkm::aktif()->distinct()->orderBy('kabupaten')
                         ->pluck('kabupaten')->filter()->values()->all(),
-                    // Kategori sidebar: hanya sektor yang benar-benar ada datanya
-                    'sektorList' => Umkm::sektorTersedia(),
                     'stats' => [
                         ['value' => (int) $agg->total,      'label' => 'Total UMKM', 'highlight' => true],
                         ['value' => (int) $agg->unggulan,   'label' => 'Unggulan'],
@@ -75,10 +75,12 @@ class UmkmController extends Controller
                 ];
             });
 
-        $trending = Umkm::muatUrut($trendingId, ['produkUnggulan', 'produk']);
+        // Kotak centang filter (pilihan & jumlah sama dengan Peta Interaktif)
+        $filterTag = TagUmkm::FILTER;
+        $jumlahTag = TagUmkm::jumlah();
 
         return view('public.direktori', compact(
-            'umkm', 'trending', 'kabupatenList', 'sektorList', 'stats'
+            'umkm', 'kabupatenList', 'stats', 'filterTag', 'jumlahTag'
         ));
     }
 

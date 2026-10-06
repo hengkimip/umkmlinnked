@@ -2,8 +2,8 @@
 @php
     $menu = [
         ['route' => 'direktori.index', 'active' => ['direktori.*'],         'label' => 'Semua Brand'],
-        ['route' => 'godigital.index', 'active' => ['godigital.*'],         'label' => 'Go Digital'],
-        ['route' => 'goglobal.index',  'active' => ['goglobal.*'],          'label' => 'Go Global'],
+        // Peta interaktif terbuka untuk umum (data publik saja)
+        ['route' => 'superadmin.peta-interaktif', 'active' => ['superadmin.peta-interaktif*'], 'label' => 'Peta Interaktif'],
         ['route' => 'tentang.index',   'active' => ['tentang.*'],           'label' => 'Tentang Kami'],
         ['route' => 'berita.index',    'active' => ['berita.*'],            'label' => 'Berita'],
         ['route' => 'kemitraan.index', 'active' => ['kemitraan.*'],         'label' => 'Kemitraan'],

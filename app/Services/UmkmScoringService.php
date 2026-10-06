@@ -8,6 +8,26 @@ class UmkmScoringService
 {
     // Total maksimum = 100 poin
     // Legalitas: 25 | Sertifikasi: 20 | Produksi: 20 | Pemasaran: 20 | Keuangan: 15
+    public const KOMPONEN = [
+        'legalitas'   => ['label' => 'Legalitas',   'maks' => 25],
+        'sertifikasi' => ['label' => 'Sertifikasi', 'maks' => 20],
+        'produksi'    => ['label' => 'Produksi',    'maks' => 20],
+        'pemasaran'   => ['label' => 'Pemasaran',   'maks' => 20],
+        'keuangan'    => ['label' => 'Keuangan',    'maks' => 15],
+    ];
+
+    /**
+     * Rincian skor kesiapan tersimpan (untuk tampilan Detail UMKM & Kelola Profil).
+     *
+     * @return list<array{label: string, nilai: int, maks: int}>
+     */
+    public static function rincian(Umkm $umkm): array
+    {
+        return collect(self::KOMPONEN)
+            ->map(fn ($k, $kode) => ['label' => $k['label'], 'nilai' => (int) $umkm->{"skor_{$kode}"}, 'maks' => $k['maks']])
+            ->values()
+            ->all();
+    }
 
     public function hitung(Umkm $umkm): array
     {

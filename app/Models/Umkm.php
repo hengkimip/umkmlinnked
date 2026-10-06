@@ -21,6 +21,8 @@ class Umkm extends Model
         'jasa'        => 'Jasa',
         'teknologi'   => 'Teknologi',
         'perdagangan' => 'Perdagangan',
+        'manufaktur'  => 'Manufaktur',
+        'kesehatan'   => 'Kesehatan & Kecantikan',
         'lainnya'     => 'Lainnya',
     ];
 
@@ -85,6 +87,32 @@ class Umkm extends Model
         return $this->belongsTo(Opd::class);
     }
 
+    /** Akun yang pertama kali memasukkan UMKM ini ke sistem. */
+    public function pendaftar()
+    {
+        return $this->belongsTo(User::class, 'didaftarkan_oleh');
+    }
+
+    /**
+     * Binaan OPD ditentukan oleh siapa yang PERTAMA memasukkan UMKM: opd_id dicatat saat dibuat
+     * dan tidak dapat dialihkan ke OPD lain lewat model. (Pemindahan massal saat Super Admin
+     * menghapus OPD memakai query langsung dan sengaja tidak melewati aturan ini.)
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $umkm) {
+            $umkm->didaftarkan_oleh ??= auth()->id();
+        });
+
+        static::updating(function (self $umkm) {
+            if ($umkm->isDirty('opd_id') && $umkm->getOriginal('opd_id') !== null) {
+                throw new \LogicException(
+                    "Status binaan UMKM \"{$umkm->nama_usaha}\" sudah ditetapkan oleh OPD yang pertama memasukkannya dan tidak dapat dialihkan."
+                );
+            }
+        });
+    }
+
     public function produk()
     {
         return $this->hasMany(Produk::class);
@@ -145,6 +173,12 @@ class Umkm extends Model
     public function produkUtama(): ?Produk
     {
         return $this->produk()->orderByDesc('is_unggulan')->orderBy('urutan')->orderBy('id')->first();
+    }
+
+    /** Teks "Binaan …" (nama OPD pembina; Bank Indonesia juga tercatat sebagai OPD). */
+    public function teksBinaan(): string
+    {
+        return $this->opd?->nama_opd ? "Binaan {$this->opd->nama_opd}" : 'Belum ada OPD pembina';
     }
 
     /**
@@ -360,6 +394,22 @@ class Umkm extends Model
             return self::validUrl('https://' . $v);
         }
         return null;
+    }
+
+    /**
+     * Tautan pencarian Google Maps dari alamat usaha (+ kabupaten/kota & provinsi agar tepat wilayah).
+     */
+    public function gmapsUrl(): ?string
+    {
+        $alamat = trim((string) $this->alamat_usaha);
+        if ($alamat === '' || $alamat === '-') {
+            return null;
+        }
+
+        $kabupaten = $this->kabupaten !== self::KABUPATEN_KOSONG ? (self::KABUPATEN_LENGKAP[$this->kabupaten] ?? $this->kabupaten) : null;
+        $kueri = implode(', ', array_filter([$alamat, $kabupaten, 'Kalimantan Barat']));
+
+        return 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($kueri);
     }
 
     /**

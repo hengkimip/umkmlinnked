@@ -8,6 +8,8 @@ use App\Models\Pemasaran;
 use App\Models\Keuangan;
 use App\Models\Produk;
 use App\Models\ProfilUmkm;
+use App\Models\User;
+use App\Services\DeteksiDuplikatService;
 use App\Services\ProfilUmkmService;
 use App\Services\UmkmScoringService;
 use Illuminate\Support\Str;
@@ -31,11 +33,12 @@ class UmkmImport implements
     private UmkmScoringService $scoring;
 
     public int $imported = 0;
+    public int $antre = 0; // baris mirip UMKM tersimpan -> antrean review duplikat
 
     // Nomor baris di file (baris 1 = header), berlanjut antar-chunk
     private int $rowNumber = 1;
 
-    public function __construct(int $opdId)
+    public function __construct(int $opdId, private ?int $userId = null)
     {
         $this->opdId   = $opdId;
         $this->scoring = new UmkmScoringService();
@@ -54,7 +57,36 @@ class UmkmImport implements
             $this->rowNumber++;
 
             try {
-                DB::transaction(function () use ($row) {
+                // null = mirip UMKM tersimpan → masuk antrean review (belum disimpan)
+                $this->simpanBaris($row->toArray()) ? $this->imported++ : $this->antre++;
+            } catch (\Throwable $e) {
+                // Detail teknis hanya ke log; pengguna menerima pesan ringkas
+                \Illuminate\Support\Facades\Log::warning("Import UMKM baris {$this->rowNumber} gagal: " . $e->getMessage());
+                $nama = trim((string) ($row['nama_umkmusaha'] ?? ''));
+                $this->errors[] = "Baris {$this->rowNumber}" . ($nama !== '' ? " ({$nama})" : '')
+                    . ': data tidak valid atau kolom wajib kosong.';
+            }
+        }
+    }
+
+    /**
+     * Simpan satu baris file sebagai UMKM baru. Bila $cekDuplikat dan skor kemiripan dengan UMKM
+     * tersimpan ≥ ambang, baris TIDAK disimpan melainkan masuk antrean review (mengembalikan null).
+     * Dipakai juga saat admin memutuskan "Usaha berbeda" di antrean (tanpa cek ulang).
+     */
+    public function simpanBaris(array $row, bool $cekDuplikat = true): ?Umkm
+    {
+        if ($cekDuplikat) {
+            $deteksi = app(DeteksiDuplikatService::class);
+            $data    = $this->keKolom($row);
+            if ($hasil = $deteksi->periksa($data)) {
+                $deteksi->antrekan($data, $hasil, $this->opdId, $this->userId ? User::find($this->userId) : null, 'impor', $row);
+
+                return null;
+            }
+        }
+
+        return DB::transaction(function () use ($row) {
                     // 1. Simpan atau update Pemilik Usaha
                     $wa = $this->cleanPhone($row['no_whatsapp'] ?? '');
 
@@ -83,7 +115,7 @@ class UmkmImport implements
                         'nama_usaha'          => $namaUsaha,
                         'slug'                => $slug,
                         'sektor'              => $this->mapSektor($row['sektor_usaha'] ?? ''),
-                        'kabupaten'           => $this->extractKabupaten($row['alamat_usaha'] ?? ''),
+                        'kabupaten'           => $this->kabupatenDari($row),
                         'kecamatan'           => '-',
                         'alamat_usaha'        => $row['alamat_usaha'] ?? '-',
                         'whatsapp'            => $this->cleanPhone($row['nomor_link_wa_bisnis'] ?? $wa),
@@ -137,9 +169,7 @@ class UmkmImport implements
                         'bentuk_legalitas'         => $legalitasRaw,
                         'sertifikasi_produk'       => $sertifRaw,
                         'metode_pencatatan'        => $pencatatan,
-                        'pembiayaan_2026'          => mb_substr((string) $this->teks($row,
-                            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan',
-                            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan_dari_lembaga_keuangan_perbankan_dan_atau_non_perbankan'), 0, 255) ?: null,
+                        'pembiayaan_2026'          => $this->pembiayaan2026($row),
                         'pembiayaan_diterima'      => $this->teks($row,
                             'jika_sudah_sebutkan_nama_lembaga_dan_jumlah_plafond',
                             'jika_sudah_mendapatkan_akses_pembiayaan_sebutkan_nama_lembaga_keuangan_dan_jumlah_plafond_yang_diterima'),
@@ -167,18 +197,76 @@ class UmkmImport implements
 
                     // 9. Hitung skor otomatis
                     $this->scoring->simpan($umkm);
-                });
 
-                $this->imported++;
+                    return $umkm;
+        });
+    }
 
-            } catch (\Throwable $e) {
-                // Detail teknis hanya ke log; pengguna menerima pesan ringkas
-                \Illuminate\Support\Facades\Log::warning("Import UMKM baris {$this->rowNumber} gagal: " . $e->getMessage());
-                $nama = trim((string) ($row['nama_umkmusaha'] ?? ''));
-                $this->errors[] = "Baris {$this->rowNumber}" . ($nama !== '' ? " ({$nama})" : '')
-                    . ': data tidak valid atau kolom wajib kosong.';
-            }
-        }
+    /**
+     * Baris file → format kolom "Kelola Profil UMKM" (untuk deteksi duplikat, tampilan review,
+     * dan memperbarui UMKM lama bila admin memutuskan "Usaha yang sama").
+     */
+    public function keKolom(array $row): array
+    {
+        $omzet = $this->cleanAngka($row['berapa_rata_rata_omzet_usaha_anda_perbulan'] ?? '');
+        $kapasitas = $this->cleanAngka($row['kapasitas_produksi_per_bulan_pcskg'] ?? '');
+        $jangkauan = $this->teks($row, 'jangkauan_pasar_utama_saat_ini');
+        $foto = $this->teks($row, 'foto_url', 'foto_produk');
+
+        return [
+            'pemilik_nama'     => $this->teks($row, 'nama_pemilik_usaha'),
+            'pemilik_alamat'   => $this->teks($row, 'alamat_lengkap'),
+            'pemilik_whatsapp' => $this->teks($row, 'no_whatsapp'),
+            'pemilik_email'    => $this->teks($row, 'alamat_e_mail'),
+            'program_bi'       => $this->teks($row, 'program_yang_pernah_diikuti_dari_bank_indonesia'),
+
+            'nama_usaha'       => $this->teks($row, 'nama_umkmusaha'),
+            'alamat_usaha'     => $this->teks($row, 'alamat_usaha'),
+            'kabupaten'        => $this->kabupatenDari($row),
+            'tahun_berdiri'    => $this->cleanYear($row['tahun_berdirinya_usaha'] ?? null),
+            'sektor'           => $this->teks($row, 'sektor_usaha') ? $this->mapSektor($row['sektor_usaha']) : null,
+            'jumlah_karyawan'  => $this->teks($row, 'jumlah_karyawan') !== null ? (int) $row['jumlah_karyawan'] : null,
+
+            'produk_unggulan'          => $this->teks($row, 'produk_jasa_unggulan'),
+            'kapasitas_produksi'       => $kapasitas > 0 ? (int) $kapasitas : null,
+            'produk_lainnya'           => $this->teks($row, 'apakah_memiliki_jenis_produk_lainnya_mohon_disebutkan_secara_spesifik'),
+            'kapasitas_produk_lainnya' => $this->teks($row, 'berapa_kapasitas_produksi_produk_tersebut'),
+            'foto_url'                 => $foto && preg_match('#^https?://#i', $foto) ? $foto : null,
+
+            'saluran_pemasaran' => $this->teks($row, 'saluran_pemasaran_produk_selama_ini'),
+            'jangkauan_pasar'   => $jangkauan ? $this->mapJangkauan(strtolower($jangkauan)) : null,
+            'wa_bisnis'         => $this->teks($row, 'nomor_link_wa_bisnis'),
+            'instagram'         => $this->teks($row, 'urllink_instagram_usaha_facebook'),
+            'marketplace'       => $this->teks($row, 'urllink_marketplace_usaha_yang_dimiliki'),
+            'website'           => $this->teks($row, 'url_link_website'),
+
+            'bentuk_legalitas'   => $this->teks($row, 'bentuk_legalitas_usaha_yang_dimiliki'),
+            'sertifikasi_produk' => $this->teks($row, 'sertifikasi_produk_yang_dimiliki'),
+
+            'metode_pencatatan'   => $this->teks($row, 'bagaimana_metode_pencatatan_keuangan_usaha_anda_saat_ini'),
+            'omzet_bulanan'       => $omzet > 0 ? $omzet : null,
+            'pembiayaan_2026'     => $this->pembiayaan2026($row),
+            'pembiayaan_diterima' => $this->teks($row,
+                'jika_sudah_sebutkan_nama_lembaga_dan_jumlah_plafond',
+                'jika_sudah_mendapatkan_akses_pembiayaan_sebutkan_nama_lembaga_keuangan_dan_jumlah_plafond_yang_diterima'),
+            'rencana_pembiayaan'  => $this->teks($row,
+                'jika_ada_rencana_sebutkan_nama_lembaga_dan_jumlah_plafond',
+                'jika_ada_rencana_akses_pembiayaan_sebutkan_nama_lembaga_keuangan_dan_jumlah_plafond_yang_akan_diajukan'),
+        ];
+    }
+
+    /** Kolom kota_kabupaten diutamakan; bila kosong/tidak dikenal, ditebak dari alamat usaha. */
+    private function kabupatenDari(array $row): string
+    {
+        return Umkm::tebakKabupaten((string) $this->teks($row, 'kota_kabupaten', 'kotakabupaten', 'kabupaten_kota'))
+            ?? $this->extractKabupaten((string) ($row['alamat_usaha'] ?? ''));
+    }
+
+    private function pembiayaan2026(array $row): ?string
+    {
+        return mb_substr((string) $this->teks($row,
+            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan',
+            'apakah_pada_tahun_2026_sudah_mendapatkan_pembiayaan_dari_lembaga_keuangan_perbankan_dan_atau_non_perbankan'), 0, 255) ?: null;
     }
 
 
@@ -284,7 +372,9 @@ private function konversiUrlDownload(string $url): string
             'kerajinan'   => ['kerajinan','craft','anyaman','tenun'],
             'pertanian'   => ['pertanian','perkebunan','tani','kebun'],
             'perikanan'   => ['perikanan','ikan','nelayan','kelautan'],
-            'jasa'        => ['jasa','layanan','service'],
+            'kesehatan'   => ['kesehatan','kecantikan','kosmetik','skincare','herbal','jamu'],
+            'manufaktur'  => ['manufaktur','industri','pabrik'],
+            'jasa'      => ['jasa','layanan','service'],
             'teknologi'   => ['teknologi','digital','it','aplikasi'],
             'perdagangan' => ['dagang','toko','retail','distributor'],
         ];

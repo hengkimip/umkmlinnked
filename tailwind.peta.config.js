@@ -9,6 +9,7 @@ import base from './tailwind.config.js';
 export default {
     content: [
         './resources/views/admin/bi-map/index.blade.php',
+        './resources/views/admin/bi-map/_*.blade.php', // partial halaman peta (mis. _sambutan)
         './resources/js/bi-map.js',
     ],
     theme: base.theme,

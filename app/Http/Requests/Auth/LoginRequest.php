@@ -54,10 +54,11 @@ class LoginRequest extends FormRequest
         $user = Auth::user();
 
         // Akun nonaktif atau tanpa peran admin tidak boleh masuk panel (FR-01)
+        // Termasuk OPD yang aksesnya dinonaktifkan Super Admin (lihat User::alasanAksesDitolak)
         $pesanTolak = match (true) {
             ! $user->is_active    => 'Akun Anda dinonaktifkan. Hubungi Super Admin.',
             ! $user->isAdminAny() => 'Akun Anda belum memiliki peran akses. Hubungi Super Admin.',
-            default               => null,
+            default               => $user->alasanAksesDitolak(),
         };
 
         if ($pesanTolak) {

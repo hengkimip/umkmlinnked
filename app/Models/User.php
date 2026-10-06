@@ -53,6 +53,36 @@ class User extends Authenticatable
         return $this->hasAnyRole([self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN_OPD]);
     }
 
+    /** Instansi pengguna: Super Admin → Bank Indonesia Wilayah Kalimantan Barat, Admin OPD → OPD-nya. */
+    public function instansi(): ?string
+    {
+        return $this->isSuperAdmin() ? config('umkm.instansi_super_admin') : $this->opd?->nama_opd;
+    }
+
+    /**
+     * Alasan akses admin ditolak (null = boleh): akun dinonaktifkan Super Admin,
+     * atau OPD-nya sedang dinonaktifkan. Nilai kosong (belum diisi) dianggap aktif.
+     */
+    public function alasanAksesDitolak(): ?string
+    {
+        return match (true) {
+            $this->is_active === false                         => 'Akun Anda dinonaktifkan. Hubungi Super Admin.',
+            $this->isAdmin() && $this->opd?->is_active === false => 'Akses OPD Anda sedang dinonaktifkan oleh Super Admin.',
+            default                                            => null,
+        };
+    }
+
+    /** Jumlah maksimum Super Admin aktif (permintaan Bank Indonesia, 1–3 orang). */
+    public static function maksSuperAdmin(): int
+    {
+        return (int) config('umkm.maks_super_admin', 3);
+    }
+
+    public static function jumlahSuperAdminAktif(): int
+    {
+        return static::role(self::ROLE_SUPER_ADMIN)->where('is_active', true)->count();
+    }
+
     /**
      * Label peran untuk ditampilkan di UI.
      */
@@ -73,6 +103,16 @@ class User extends Authenticatable
     {
         return $this->isSuperAdmin()
             ? route('superadmin.peta-interaktif', absolute: false)
+            : $this->dashboardUrl();
+    }
+
+    /**
+     * Dashboard sesuai peran: Super Admin → /superadmin/dashboard, Admin OPD → /admin/dashboard.
+     */
+    public function dashboardUrl(): string
+    {
+        return $this->isSuperAdmin()
+            ? route('superadmin.dashboard', absolute: false)
             : route('admin.dashboard', absolute: false);
     }
 }

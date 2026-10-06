@@ -31,23 +31,14 @@ class GoDigitalController extends Controller
             });
         }
 
-        foreach (['sektor', 'kabupaten', 'klasifikasi'] as $kolom) {
+        foreach (['kabupaten', 'klasifikasi'] as $kolom) {
             if (isset($f[$kolom])) {
                 $query->where($kolom, $f[$kolom]);
             }
         }
 
-        // Filter: Platform spesifik (nilai sudah dibatasi ke FilterUmkm::PLATFORM)
-        if (isset($f['platform'])) {
-            $platform = $f['platform'];
-            $query->where(function ($q) use ($platform) {
-                if (in_array($platform, ['tokopedia', 'shopee', 'instagram', 'whatsapp'], true)) {
-                    $q->whereNotNull($platform);
-                } else {
-                    $q->whereHas('pemasaran', fn($p) => $p->where('platform_online', 'like', FilterUmkm::like($platform)));
-                }
-            });
-        }
+        // Sektor & platform digital: pencocokan sama dengan Semua Brand dan Peta Interaktif
+        FilterUmkm::terapkanTag($query, $f);
 
         $umkm = $query->orderByDesc('skor_total')
                       ->paginate(12)
