@@ -21,7 +21,7 @@ class AuthenticatedSessionController extends Controller
 
     /**
      * Proses login. Redirect berbasis peran (FR-16):
-     * super-admin → peta interaktif, selain itu → dashboard admin.
+     * super-admin → /superadmin/dashboard, admin-opd → /admin/dashboard.
      * Tujuan "intended" tetap dihormati.
      */
     public function store(LoginRequest $request): RedirectResponse

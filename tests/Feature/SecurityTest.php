@@ -169,6 +169,13 @@ class SecurityTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_login_rejects_oversized_input(): void
+    {
+        $this->post('/login', ['email' => str_repeat('a', 300) . '@umkmlinked.test', 'password' => str_repeat('x', 300)])
+            ->assertSessionHasErrors(['email', 'password']);
+        $this->assertGuest();
+    }
+
     public function test_public_registration_is_disabled(): void
     {
         $this->get('/register')->assertNotFound();

@@ -52,7 +52,7 @@ Route::get('/direktori/{slug?}', function (Request $request, ?string $slug = nul
     $query  = $request->getQueryString();
 
     return redirect($tujuan . ($query ? '?' . $query : ''), 301);
-})->where('slug', '[A-Za-z0-9-]+');
+})->where('slug', '[A-Za-z0-9-]+')->middleware('throttle:120,1');
 
 // ==================== ADMIN (super-admin & admin-opd) ====================
 
@@ -171,10 +171,12 @@ Route::middleware(['auth', 'verified', 'role:super-admin|admin-opd'])
     ->name('superadmin.peta-interaktif.umkm');
 
 // Alamat lama peta interaktif → alamat baru (tautan/bookmark lama tetap jalan)
-foreach (['admin', 'superadmin'] as $lama) {
-    Route::permanentRedirect("/{$lama}/peta-interaktif", '/peta-interaktif');
-    Route::get("/{$lama}/peta-interaktif/umkm/{id}", fn (string $id) => redirect("/peta-interaktif/umkm/{$id}", 301))
-        ->whereNumber('id');
-}
+Route::middleware('throttle:120,1')->group(function () {
+    foreach (['admin', 'superadmin'] as $lama) {
+        Route::permanentRedirect("/{$lama}/peta-interaktif", '/peta-interaktif');
+        Route::get("/{$lama}/peta-interaktif/umkm/{id}", fn (string $id) => redirect("/peta-interaktif/umkm/{$id}", 301))
+            ->whereNumber('id');
+    }
+});
 
 require __DIR__ . '/auth.php';

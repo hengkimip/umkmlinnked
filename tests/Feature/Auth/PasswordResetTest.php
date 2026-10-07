@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -69,5 +70,30 @@ class PasswordResetTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_password_reset_ends_all_existing_sessions(): void
+    {
+        Notification::fake();
+        config(['session.driver' => 'database']);
+
+        $user = User::factory()->create(['remember_token' => 'token-lama']);
+        DB::table('sessions')->insert(['id' => 'sesi-lama', 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
+
+        $this->post('/forgot-password', ['email' => $user->email]);
+
+        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+            $this->post('/reset-password', [
+                'token' => $notification->token,
+                'email' => $user->email,
+                'password' => 'password-baru',
+                'password_confirmation' => 'password-baru',
+            ])->assertSessionHasNoErrors();
+
+            return true;
+        });
+
+        $this->assertDatabaseMissing('sessions', ['id' => 'sesi-lama']);
+        $this->assertNotSame('token-lama', $user->fresh()->remember_token);
     }
 }

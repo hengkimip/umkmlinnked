@@ -27,14 +27,18 @@ class AuthenticationTest extends TestCase
             ->assertDontSee('/register');
     }
 
-    public function test_super_admin_is_redirected_to_peta_interaktif(): void
+    public function test_super_admin_is_redirected_to_superadmin_dashboard(): void
     {
         $user = User::factory()->create()->assignRole(User::ROLE_SUPER_ADMIN);
 
         $response = $this->post('/login', ['email' => $user->email, 'password' => 'password']);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('superadmin.peta-interaktif', absolute: false));
+        $response->assertRedirect('/superadmin/dashboard');
+
+        // Membuka /login atau /dashboard saat sudah login juga ke dashboard Super Admin
+        $this->get('/login')->assertRedirect('/superadmin/dashboard');
+        $this->get('/dashboard')->assertRedirect('/superadmin/dashboard');
     }
 
     public function test_admin_opd_is_redirected_to_dashboard(): void

@@ -28,8 +28,9 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            // Batas panjang: tolak kiriman raksasa sebelum hashing kata sandi dijalankan
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'password' => ['required', 'string', 'max:255'],
         ];
     }
 

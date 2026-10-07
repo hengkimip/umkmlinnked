@@ -14,6 +14,8 @@ use Illuminate\Validation\Rule;
 class ProdukFotoController extends Controller
 {
     private const MAKS_PRODUK = 10;
+    // Batas resolusi: file 2 MB bisa berisi gambar berpiksel raksasa yang menghabiskan memori server
+    public const DIMENSI = 'dimensions:max_width=8000,max_height=8000';
 
     public function index(Request $request)
     {
@@ -38,7 +40,7 @@ class ProdukFotoController extends Controller
             'umkm_id'     => ['required', 'integer', 'exists:umkm,id'],
             'nama_produk' => ['required', 'string', 'max:255'],
             'foto'        => ['required', 'array', 'min:1', 'max:' . self::MAKS_PRODUK],
-            'foto.*'      => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'foto.*'      => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048', self::DIMENSI],
             'badge'       => ['nullable', 'array'],
             'badge.*'     => ['nullable', Rule::in(array_keys(Produk::BADGE))],
             'harga'       => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
@@ -51,6 +53,7 @@ class ProdukFotoController extends Controller
             'foto.*.image'         => 'File harus berupa gambar.',
             'foto.*.mimes'         => 'Format foto harus JPG, PNG, atau WEBP.',
             'foto.*.max'           => 'Ukuran foto maksimal 2 MB.',
+            'foto.*.dimensions'    => 'Resolusi foto maksimal 8000 × 8000 piksel.',
             'badge.*.in'           => 'Badge produk tidak valid.',
             'harga.numeric'        => 'Harga harus berupa angka.',
         ]);
@@ -141,7 +144,7 @@ class ProdukFotoController extends Controller
             'harga'       => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
             'deskripsi'   => ['nullable', 'string', 'max:2000'],
             'badge'       => ['nullable', Rule::in(array_keys(Produk::BADGE))],
-            'foto'        => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'foto'        => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048', self::DIMENSI],
         ], [
             'nama_produk.required' => 'Nama produk wajib diisi.',
             'deskripsi.max'        => 'Keterangan maksimal 2000 karakter.',
@@ -149,6 +152,7 @@ class ProdukFotoController extends Controller
             'foto.image'           => 'File harus berupa gambar.',
             'foto.mimes'           => 'Format foto harus JPG, PNG, atau WEBP.',
             'foto.max'             => 'Ukuran foto maksimal 2 MB.',
+            'foto.dimensions'      => 'Resolusi foto maksimal 8000 × 8000 piksel.',
         ]);
 
         DB::transaction(function () use ($request, $produk, $data) {

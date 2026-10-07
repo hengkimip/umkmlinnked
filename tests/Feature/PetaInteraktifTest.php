@@ -226,9 +226,11 @@ class PetaInteraktifTest extends TestCase
         $this->actingAs($this->superAdmin())->get('/peta-interaktif')
             ->assertOk()
             ->assertSee('geo/kalbar.geojson')
-            ->assertSeeInOrder(['Wilayah', 'Sektor Usaha', 'Platform Digital', 'Jangkauan Pasar', 'Sertifikasi Produk', 'Reset'])
+            ->assertSeeInOrder(['Wilayah', 'Sektor Usaha', 'Platform Digital', 'Jangkauan Pasar', 'Sertifikasi Produk', 'Reset', 'Beranda'])
             ->assertSee(['Kesehatan &amp; Kecantikan', 'TikTok Shop', 'Ekspor (Internasional)', 'HKI/Merek Terdaftar'], false)
-            ->assertSee('href="' . route('direktori.index') . '"', false)
+            // Tombol "Beranda" (dulu "Semua Brand") kembali ke halaman depan
+            ->assertSee('href="' . route('home') . '"', false)
+            ->assertDontSee('Semua Brand')
             ->assertDontSee('Panel Admin')
             ->assertDontSee('Semua Tier');
     }

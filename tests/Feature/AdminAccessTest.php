@@ -232,6 +232,25 @@ class AdminAccessTest extends TestCase
         Storage::disk('public')->assertMissing($thumb);
     }
 
+    public function test_photo_with_oversized_resolution_is_rejected(): void
+    {
+        Storage::fake('public');
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd($this->opdA);
+
+        // File kecil tetapi berpiksel raksasa (menghabiskan memori saat dibuat thumbnail) ditolak
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi',
+            'foto'    => [UploadedFile::fake()->image('raksasa.png', 8001, 10)],
+        ])->assertSessionHasErrors('foto.0');
+        $this->assertSame(0, $umkm->produk()->count());
+
+        $this->actingAs($admin)->post('/admin/produk/upload-foto', [
+            'umkm_id' => $umkm->id, 'nama_produk' => 'Kopi',
+            'foto'    => [UploadedFile::fake()->image('wajar.jpg', 1600, 1200)],
+        ])->assertSessionHas('success');
+    }
+
     public function test_badge_unggulan_becomes_the_only_main_photo(): void
     {
         Storage::fake('public');

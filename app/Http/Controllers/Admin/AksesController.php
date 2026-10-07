@@ -197,9 +197,7 @@ class AksesController extends Controller
                 : UmkmDuplikat::where('opd_id', $opd->id)->delete();
 
             foreach ($admin as $u) {
-                if (config('session.driver') === 'database') {
-                    DB::table(config('session.table', 'sessions'))->where('user_id', $u->id)->delete();
-                }
+                $u->akhiriSesi();
                 $u->delete();
             }
 
@@ -266,10 +264,7 @@ class AksesController extends Controller
                 ->log("Akun {$keterangan} dihapus");
 
             // Sesi yang masih login ikut diakhiri
-            if (config('session.driver') === 'database') {
-                DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
-            }
-
+            $user->akhiriSesi();
             $user->delete();
         });
 

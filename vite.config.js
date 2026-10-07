@@ -20,4 +20,11 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    // Build produksi: buang console.log/debug (log diagnostik peta) agar skrip lebih ringan
+    // dan isi data tidak tercetak di konsol browser. console.warn/error tetap ada.
+    build: {
+        rolldownOptions: {
+            treeshake: { manualPureFunctions: ["console.log", "console.debug"] },
+        },
+    },
 });

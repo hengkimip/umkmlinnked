@@ -80,13 +80,14 @@ class BeritaController extends Controller
             'judul'       => ['required', 'string', 'max:255'],
             'ringkasan'   => ['nullable', 'string', 'max:300'],
             'isi'         => ['required', 'string', 'max:50000'],
-            'gambar'      => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'gambar'      => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048', ProdukFotoController::DIMENSI],
             'status'      => ['required', Rule::in(array_keys(Berita::STATUS))],
             'terbit_pada' => ['nullable', 'date'],
         ], [
             'gambar.image' => 'File harus berupa gambar.',
             'gambar.mimes' => 'Format gambar harus JPG, PNG, atau WEBP.',
             'gambar.max'   => 'Ukuran gambar maksimal 2 MB.',
+            'gambar.dimensions' => 'Resolusi gambar maksimal 8000 × 8000 piksel.',
         ], [
             'judul' => 'judul', 'ringkasan' => 'ringkasan', 'isi' => 'isi berita', 'terbit_pada' => 'tanggal terbit',
         ]);

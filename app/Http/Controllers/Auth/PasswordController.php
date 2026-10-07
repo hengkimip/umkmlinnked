@@ -24,6 +24,10 @@ class PasswordController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Sesi di perangkat lain (mis. yang kata sandinya bocor) ikut berakhir; sesi ini diperbarui
+        $request->session()->regenerate();
+        $request->user()->akhiriSesi(kecuali: $request->session()->getId());
+
         return back()->with('status', 'password-updated');
     }
 }

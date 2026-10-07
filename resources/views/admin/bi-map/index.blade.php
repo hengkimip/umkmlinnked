@@ -106,10 +106,10 @@
                     Reset
                 </button>
 
-                {{-- SEMUA BRAND (halaman publik, di tab yang sama) --}}
-                <a href="{{ route('direktori.index') }}"
+                {{-- BERANDA (halaman publik, di tab yang sama) --}}
+                <a href="{{ route('home') }}"
                    class="flex-shrink-0 px-3 py-2 bg-[#003066] text-white rounded-lg text-[13px] font-bold hover:bg-[#002550] transition-all whitespace-nowrap">
-                    Semua Brand
+                    Beranda
                 </a>
             </div>
 

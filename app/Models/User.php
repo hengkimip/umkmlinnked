@@ -6,6 +6,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -96,14 +98,12 @@ class User extends Authenticatable
     }
 
     /**
-     * Halaman tujuan setelah login (FR-16):
-     * super-admin → peta interaktif, selain itu → dashboard admin.
+     * Halaman tujuan setelah login (FR-16): dashboard sesuai peran
+     * (super-admin → /superadmin/dashboard, admin-opd → /admin/dashboard).
      */
     public function homeUrl(): string
     {
-        return $this->isSuperAdmin()
-            ? route('superadmin.peta-interaktif', absolute: false)
-            : $this->dashboardUrl();
+        return $this->dashboardUrl();
     }
 
     /**
@@ -114,5 +114,23 @@ class User extends Authenticatable
         return $this->isSuperAdmin()
             ? route('superadmin.dashboard', absolute: false)
             : route('admin.dashboard', absolute: false);
+    }
+
+    /**
+     * Akhiri sesi login akun ini di perangkat lain (kata sandi diganti/direset, akun dihapus):
+     * hapus sesinya di database dan batalkan cookie "ingat saya". $kecuali = sesi yang dipertahankan.
+     */
+    public function akhiriSesi(?string $kecuali = null): void
+    {
+        if (config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $this->id)
+                ->when($kecuali, fn ($q) => $q->where('id', '!=', $kecuali))
+                ->delete();
+        }
+
+        if ($this->exists) {
+            $this->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
+        }
     }
 }
