@@ -11,7 +11,7 @@
         'desc'  => 'Eksplorasi produk unggulan UMKM Kalimantan Barat yang telah terkurasi dan siap bersaing di pasar nasional maupun global.',
     ])
 
-    @include('public.partials.stats', ['stats' => $stats])
+    @include('public.partials.stats', ['stats' => $stats, 'satuBaris' => true])
 
     <div class="ib-container">
 

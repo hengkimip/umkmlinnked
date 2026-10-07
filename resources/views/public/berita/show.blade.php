@@ -1,27 +1,51 @@
 @extends('layouts.public')
 
-@section('title', 'Detail Berita — UMKMLinked.ID')
+@section('title', $berita->judul . ' — Berita UMKMLinked.ID')
+@section('description', $berita->cuplikan(160))
+@section('meta')
+    @vite('resources/css/berita.css')
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="{{ $berita->judul }}">
+    <meta property="og:description" content="{{ $berita->cuplikan(160) }}">
+    @if ($berita->gambarUrl())
+        <meta property="og:image" content="{{ $berita->gambarUrl() }}">
+    @endif
+@endsection
 
 @section('content')
-<div class="max-w-3xl mx-auto px-4 py-10">
+<div class="ib-body">
+    <article class="ib-artikel" aria-labelledby="page-title">
+        <a href="{{ route('berita.index') }}" class="ib-artikel__kembali">← Kembali ke Berita</a>
 
-    <a href="{{ route('berita.index') }}"
-       class="text-sm text-green-700 hover:underline">← Kembali ke Berita</a>
+        <header class="ib-artikel__head">
+            <span class="ib-artikel__label">Berita official</span>
+            <h1 id="page-title" class="ib-artikel__judul">{{ $berita->judul }}</h1>
+            <p class="ib-artikel__meta">
+                <time datetime="{{ $berita->terbit_pada->toIso8601String() }}">{{ $berita->terbit_pada->translatedFormat('d F Y') }}</time>
+                · Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat
+            </p>
+        </header>
 
-    <h1 class="text-2xl font-bold text-gray-800 mt-4 mb-2">
-        Judul Berita
-    </h1>
-    <p class="text-xs text-gray-400 mb-6">{{ now()->format('d M Y') }} · Admin UMKMLinked.ID</p>
+        @if ($berita->gambarUrl())
+            <img class="ib-artikel__gambar" src="{{ $berita->gambarUrl() }}" alt="" width="1200" height="675" fetchpriority="high">
+        @endif
 
-    <div class="aspect-video bg-gradient-to-br from-green-50 to-green-100
-                rounded-2xl flex items-center justify-center text-6xl mb-8">
-        📰
-    </div>
+        <div class="ib-artikel__isi">
+            @foreach ($berita->paragraf() as $p)
+                <p>{!! nl2br(e($p)) !!}</p>
+            @endforeach
+        </div>
+    </article>
 
-    <div class="prose prose-gray max-w-none text-gray-600 leading-relaxed">
-        <p>Konten berita akan tampil di sini setelah fitur manajemen berita diimplementasikan
-           di panel admin.</p>
-    </div>
-
+    @if ($lainnya->isNotEmpty())
+        <section class="ib-page-section ib-berita-lain" aria-labelledby="berita-lain-title">
+            <h2 id="berita-lain-title" class="ib-berita-lain__judul">Berita lainnya</h2>
+            <div class="ib-berita-grid">
+                @foreach ($lainnya as $b)
+                    @include('public.berita._kartu', ['b' => $b])
+                @endforeach
+            </div>
+        </section>
+    @endif
 </div>
 @endsection

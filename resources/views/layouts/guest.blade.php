@@ -45,7 +45,7 @@
                 </div>
 
                 <p class="relative text-xs text-slate-300">
-                    © {{ date('Y') }} KPw Bank Indonesia Provinsi Kalimantan Barat
+                    © {{ date('Y') }} Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat
                 </p>
             </aside>
 

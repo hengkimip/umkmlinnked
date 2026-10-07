@@ -71,6 +71,9 @@
                 <a href="{{ route('superadmin.peta-interaktif') }}" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900">
                     Buka Peta Interaktif
                 </a>
+                <a href="{{ route('superadmin.berita.create') }}" class="rounded-lg bg-gold-500 px-4 py-2 text-sm font-medium text-navy-950 transition hover:bg-gold-400">
+                    Tulis Berita Official
+                </a>
             @endif
             <a href="{{ route('admin.profil-umkm.index') }}" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-navy-900">
                 Kelola Profil UMKM
@@ -81,7 +84,7 @@
             <a href="{{ route('admin.produk.upload-foto') }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
                 Upload Foto Produk
             </a>
-            <a href="{{ route('home') }}" target="_blank" rel="noopener" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+            <a href="{{ route('home') }}" data-situs-publik class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
                 Lihat Website Publik
             </a>
         </div>

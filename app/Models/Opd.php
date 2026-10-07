@@ -7,11 +7,22 @@ class Opd extends Model
 {
     protected $table = 'opd';
 
+    // Wilayah kerja OPD: tingkat provinsi, atau salah satu kota/kabupaten (kolom "kabupaten")
+    public const PROVINSI = 'Provinsi';
+    public const WILAYAH_PROVINSI = [self::PROVINSI => 'Provinsi Kalimantan Barat'];
+    public const WILAYAH = self::WILAYAH_PROVINSI + Umkm::KABUPATEN_LENGKAP;
+
     protected $fillable = [
         'nama_opd','kode_opd','kabupaten',
         'alamat','telepon','email','website','is_active','maks_admin',
     ];
     protected $casts = ['is_active' => 'boolean', 'maks_admin' => 'integer'];
+
+    /** Nama wilayah kerja, mis. "Provinsi Kalimantan Barat" atau "Kab. Sambas". */
+    public function wilayahLabel(): string
+    {
+        return self::WILAYAH[$this->kabupaten] ?? (string) $this->kabupaten;
+    }
 
     public function users()
     {

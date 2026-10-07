@@ -1,0 +1,183 @@
+/* ==========================================================================
+   BERITA — daftar & detail berita official (dikelola Super Admin)
+   Memakai token desain dari direktori-layout.css (warna, tipografi, radius).
+   ========================================================================== */
+
+/* ---------- Kartu berita ---------- */
+.ib-berita-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+}
+.ib-berita-card {
+    min-width: 0;
+}
+.ib-berita-card__link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ib-berita-card__link:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+.ib-berita-card__link:focus-visible {
+    outline: 3px solid var(--gold-400);
+    outline-offset: 2px;
+}
+.ib-berita-card__foto {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 16 / 9;
+    background: linear-gradient(135deg, var(--navy-900), var(--navy-700));
+    color: #fff;
+    font-size: var(--fs-h3);
+    font-weight: 800;
+    letter-spacing: var(--tracking-tight);
+}
+.ib-berita-card__foto b {
+    color: var(--gold-400);
+}
+.ib-berita-card__foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.ib-berita-card__isi {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+}
+.ib-berita-card__tanggal {
+    color: var(--muted);
+    font-size: var(--fs-12);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.ib-berita-card__judul {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-h3);
+    font-weight: 700;
+    line-height: 1.35;
+}
+.ib-berita-card__ringkas {
+    flex: 1;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-14);
+    line-height: 1.6;
+}
+.ib-berita-card__baca {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    color: var(--navy-700);
+    font-size: var(--fs-14);
+    font-weight: 600;
+}
+
+/* ---------- Detail berita ---------- */
+.ib-artikel {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: clamp(32px, 5vw, 56px) var(--gutter) 0;
+}
+.ib-artikel__kembali {
+    color: var(--navy-700);
+    font-size: var(--fs-14);
+    font-weight: 600;
+    text-decoration: none;
+}
+.ib-artikel__kembali:hover {
+    text-decoration: underline;
+}
+.ib-artikel__head {
+    margin: 20px 0 28px;
+}
+.ib-artikel__label {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--gold-050);
+    color: #8a6508; /* emas gelap, kontras cukup di atas gold-050 */
+    font-size: var(--fs-12);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.ib-artikel__judul {
+    margin: 14px 0 10px;
+    color: var(--ink);
+    font-size: var(--fs-h1);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: var(--tracking-tight);
+    text-wrap: balance;
+}
+.ib-artikel__meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-14);
+}
+.ib-artikel__gambar {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-bottom: 28px;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+}
+.ib-artikel__isi {
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 1.8;
+}
+.ib-artikel__isi p {
+    margin: 0 0 1.2em;
+    overflow-wrap: anywhere;
+}
+
+/* ---------- Berita lainnya ---------- */
+.ib-berita-lain {
+    padding-top: clamp(40px, 6vw, 72px);
+}
+.ib-berita-lain__judul {
+    margin: 0 0 20px;
+    color: var(--ink);
+    font-size: var(--fs-h2);
+    font-weight: 700;
+}
+
+@media (max-width: 960px) {
+    .ib-berita-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 640px) {
+    .ib-berita-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ib-berita-card__link {
+        transition: none;
+    }
+    .ib-berita-card__link:hover {
+        transform: none;
+    }
+}

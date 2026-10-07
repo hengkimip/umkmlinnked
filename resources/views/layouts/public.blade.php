@@ -8,7 +8,8 @@
         ['route' => 'berita.index',    'active' => ['berita.*'],            'label' => 'Berita'],
         ['route' => 'kemitraan.index', 'active' => ['kemitraan.*'],         'label' => 'Kemitraan'],
     ];
-    $ctaUrl   = auth()->check() ? route('dashboard') : route('login');
+    // Langsung ke dashboard sesuai peran: Super Admin → /superadmin/dashboard, Admin OPD → /admin/dashboard
+    $ctaUrl   = auth()->check() ? auth()->user()->dashboardUrl() : route('login');
     $ctaLabel = auth()->check() ? 'Dashboard' : 'Login Admin';
 @endphp
 <!DOCTYPE html>
@@ -81,8 +82,8 @@
             <div>
                 <p class="ib-footer__logo">UMKMLinked<span>.ID</span></p>
                 <p class="ib-footer__tagline">
-                    Direktori dan dashboard UMKM binaan KPw Bank Indonesia Provinsi Kalimantan Barat —
-                    dari Sambas hingga Ketapang, dari Pontianak hingga Kapuas Hulu.
+                    Direktori dan dashboard UMKM Binaan Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat —
+                    dari 14 kabupaten dan kota.
                 </p>
             </div>
             <nav class="ib-footer__links" aria-label="Tautan footer">

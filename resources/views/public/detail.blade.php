@@ -295,7 +295,7 @@
             @endif
 
             <ul class="ib-trust">
-                <li><x-public.icon name="check-circle" :size="18" />UMKM binaan KPw Bank Indonesia Kalimantan Barat</li>
+                <li><x-public.icon name="check-circle" :size="18" />UMKM Binaan Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat</li>
                 <li><x-public.icon name="check-circle" :size="18" />Transaksi langsung dengan pemilik usaha</li>
                 @if ($sertifikat)
                     <li><x-public.icon name="check-circle" :size="18" />Memiliki {{ implode(', ', $sertifikat) }}</li>

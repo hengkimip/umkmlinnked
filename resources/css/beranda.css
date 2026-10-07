@@ -55,44 +55,6 @@
     transform: scale(0.97);
 }
 
-/* Chip lompat ke kategori */
-.ib-home-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 20px;
-}
-.ib-home-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: var(--fs-14);
-    font-weight: 600;
-    text-decoration: none;
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-.ib-home-chip span {
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
-    font-size: var(--fs-12);
-}
-.ib-home-chip:hover {
-    transform: translateY(-1px);
-    background: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.4);
-}
-.ib-home-chip--navy .ib-icon { color: #bfdbfe; }
-.ib-home-chip--teal .ib-icon { color: #5eead4; }
-.ib-home-chip--gold .ib-icon { color: var(--gold-400); }
-
 /* ---------- Baris produk ---------- */
 .ib-rail {
     --rail-accent: var(--navy-900);
@@ -197,7 +159,13 @@
     text-align: center;
 }
 
-/* Empat produk berjejer per baris kategori; 2 × 2 di layar kecil */
+/* Semua Brand: baris-baris 4 produk tersusun ke bawah */
+.ib-rail__rows {
+    display: grid;
+    gap: var(--gap);
+}
+
+/* Empat produk berjejer per baris; 2 × 2 di layar kecil */
 .ib-rail__grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

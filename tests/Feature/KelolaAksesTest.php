@@ -93,6 +93,34 @@ class KelolaAksesTest extends TestCase
         $this->post('/login', ['email' => $admin->email, 'password' => 'password'])->assertRedirect('/admin/dashboard');
     }
 
+    public function test_super_admin_can_grant_access_to_provincial_opd(): void
+    {
+        $super = $this->superAdmin();
+
+        $this->actingAs($super)->get('/superadmin/akses')->assertOk()
+            ->assertSeeInOrder(['id="tambah-opd-title"', 'Beri akses OPD baru', 'id="akun-title"', 'Tambah akun'], false)   // OPD dulu, baru akun
+            ->assertSee('Provinsi/Kota/Kabupaten')
+            ->assertSee('<option value="Provinsi" >Provinsi Kalimantan Barat</option>', false);
+
+        $this->actingAs($super)->post('/superadmin/akses/opd', [
+            'nama_opd' => 'Dinas Koperasi dan UKM Provinsi Kalimantan Barat', 'kode_opd' => 'DISKOP-PROV',
+            'kabupaten' => Opd::PROVINSI, 'maks_admin' => 1,
+        ])->assertSessionHas('success');
+
+        $prov = Opd::firstWhere('kode_opd', 'DISKOP-PROV');
+        $this->assertSame(Opd::PROVINSI, $prov->kabupaten);
+        $this->assertSame('Provinsi Kalimantan Barat', $prov->wilayahLabel());
+        $this->actingAs($super)->get('/superadmin/akses')->assertSee('DISKOP-PROV · Provinsi Kalimantan Barat');
+
+        // OPD kota/kabupaten bisa dipindah ke tingkat provinsi; wilayah lain tetap ditolak
+        $this->actingAs($super)->patch("/superadmin/akses/opd/{$this->opd->id}", ['kabupaten' => Opd::PROVINSI])->assertSessionHas('success');
+        $this->assertSame(Opd::PROVINSI, $this->opd->fresh()->kabupaten);
+
+        $this->actingAs($super)->post('/superadmin/akses/opd', [
+            'nama_opd' => 'Dinas Luar', 'kode_opd' => 'LUAR', 'kabupaten' => 'Jakarta', 'maks_admin' => 1,
+        ])->assertSessionHasErrors('kabupaten', null, 'opd');
+    }
+
     public function test_super_admin_decides_whether_opd_admins_may_be_duplicated(): void
     {
         $super = $this->superAdmin();

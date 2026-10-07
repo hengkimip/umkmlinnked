@@ -39,6 +39,7 @@ class AksesController extends Controller
             'superAktif'      => User::jumlahSuperAdminAktif(),
             'maksSuper'       => User::maksSuperAdmin(),
             'opd'             => $opd,
+            'wilayahProvinsi' => Opd::WILAYAH_PROVINSI,
             'kabupaten'       => Umkm::KABUPATEN_LENGKAP,
             'maksAdminOpd'    => self::MAKS_ADMIN_OPD,
         ]);
@@ -50,7 +51,7 @@ class AksesController extends Controller
         $data = $request->validateWithBag('opd', [
             'nama_opd'   => ['required', 'string', 'max:255'],
             'kode_opd'   => ['required', 'alpha_dash', 'max:30', 'unique:opd,kode_opd'],
-            'kabupaten'  => ['required', Rule::in(array_keys(Umkm::KABUPATEN_LENGKAP))],
+            'kabupaten'  => ['required', Rule::in(array_keys(Opd::WILAYAH))],
             'maks_admin' => ['required', 'integer', 'min:1', 'max:' . self::MAKS_ADMIN_OPD],
         ], [], ['nama_opd' => 'nama OPD', 'kode_opd' => 'kode OPD', 'maks_admin' => 'batas admin']);
 
@@ -67,7 +68,7 @@ class AksesController extends Controller
             'maks_admin' => ['sometimes', 'integer', 'min:1', 'max:' . self::MAKS_ADMIN_OPD],
             // Nama OPD = "Instansi" admin-nya & label "Binaan …" pada UMKM binaannya
             'nama_opd'   => ['sometimes', 'required', 'string', 'max:255', Rule::unique('opd', 'nama_opd')->ignore($opd->id)],
-            'kabupaten'  => ['sometimes', 'required', Rule::in(array_keys(Umkm::KABUPATEN_LENGKAP))],
+            'kabupaten'  => ['sometimes', 'required', Rule::in(array_keys(Opd::WILAYAH))],
         ], [], ['nama_opd' => 'nama OPD']);
         $namaLama = $opd->nama_opd;
 

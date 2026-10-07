@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\ProfilUmkmController;
 use App\Http\Controllers\Admin\BiMapController;
 use App\Http\Controllers\Admin\DuplikatController;
 use App\Http\Controllers\Admin\AksesController;
+use App\Http\Controllers\Admin\BeritaController as AdminBeritaController;
 use App\Http\Controllers\ProfileController;
 
 // ==================== PUBLIK (tanpa login) ====================
@@ -37,7 +38,7 @@ Route::middleware('throttle:120,1')->group(function () {
     Route::prefix('berita')->name('berita.')->group(function () {
         Route::get('/', [BeritaController::class, 'index'])->name('index');
         Route::get('/{slug}', [BeritaController::class, 'show'])
-            ->where('slug', '[a-z0-9-]{1,120}')
+            ->where('slug', '[a-z0-9-]{1,140}')
             ->name('show');
     });
 
@@ -140,6 +141,16 @@ Route::middleware(['auth', 'verified', 'role:super-admin'])
             Route::patch('/akses/pengguna/{user}', [AksesController::class, 'ubahPengguna'])->whereNumber('user')->name('akses.pengguna.update');
             Route::patch('/akses/pengguna/{user}/opd', [AksesController::class, 'pindahOpd'])->whereNumber('user')->name('akses.pengguna.opd');
             Route::delete('/akses/pengguna/{user}', [AksesController::class, 'hapusPengguna'])->whereNumber('user')->name('akses.pengguna.destroy');
+        });
+
+        // Berita official yang tampil di halaman publik /berita
+        Route::get('/berita', [AdminBeritaController::class, 'index'])->name('berita.index');
+        Route::get('/berita/tulis', [AdminBeritaController::class, 'create'])->name('berita.create');
+        Route::get('/berita/{berita}/ubah', [AdminBeritaController::class, 'edit'])->whereNumber('berita')->name('berita.edit');
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/berita', [AdminBeritaController::class, 'store'])->name('berita.store');
+            Route::put('/berita/{berita}', [AdminBeritaController::class, 'update'])->whereNumber('berita')->name('berita.update');
+            Route::delete('/berita/{berita}', [AdminBeritaController::class, 'destroy'])->whereNumber('berita')->name('berita.destroy');
         });
     });
 

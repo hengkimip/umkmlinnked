@@ -112,7 +112,7 @@
                                 <option value="">— Pilih OPD pembina —</option>
                                 @foreach ($daftarOpd as $o)
                                     <option value="{{ $o->id }}" @selected(old('opd_id', $daftarOpd->count() === 1 ? $o->id : null) == $o->id)>
-                                        {{ $o->nama_opd }}@if ($o->kabupaten) — {{ $o->kabupaten }}@endif
+                                        {{ $o->nama_opd }}@if ($o->kabupaten) — {{ $o->wilayahLabel() }}@endif
                                     </option>
                                 @endforeach
                             </select>

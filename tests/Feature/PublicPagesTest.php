@@ -211,7 +211,9 @@ class PublicPagesTest extends TestCase
 
         $this->get('/tentang-kami')
             ->assertOk()
-            ->assertSee('UMKM terdata')
+            ->assertSee('<dt class="ib-stats__label">Brand UMKM</dt>', false)
+            ->assertSee('<dt class="ib-stats__label">Kerajinan</dt>', false)
+            ->assertDontSee('UMKM terdata')
             ->assertSee('Visi')
             ->assertSee('Fitur platform');
     }
@@ -221,16 +223,21 @@ class PublicPagesTest extends TestCase
         $this->get('/semua-brand?q=' . str_repeat('a', 5000))->assertOk();
     }
 
-    public function test_home_shows_three_product_rows_and_logo_links_home(): void
+    public function test_home_shows_only_semua_brand_without_categories_and_logo_links_home(): void
     {
-        $this->umkm(); // Instagram + Halal + regional → muncul di ketiga baris
+        $this->umkm(); // Instagram + Halal + regional → dulu juga muncul di Go Digital & Go Global
 
-        $this->get('/')
+        $html = $this->get('/')
             ->assertOk()
-            ->assertSeeInOrder(['Semua Brand', 'Kopi Kapuas', 'Go Digital', 'Kopi Kapuas', 'Go Global', 'Kopi Kapuas'])
+            ->assertSee('id="semua-brand"', false)
+            ->assertDontSee('id="go-digital"', false)->assertDontSee('id="go-global"', false)
+            ->assertDontSee('Kategori 1')->assertDontSee('ib-home-chip', false)
             ->assertSee('logo-umkmlinked.webp')
             ->assertSee('href="' . route('home') . '"', false)
-            ->assertSee(route('direktori.index'));
+            ->assertSee(route('direktori.index'))
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, 'Kopi Kapuas</p>'));   // tampil sekali saja
     }
 
     public function test_navbar_has_map_after_semua_brand_without_go_digital_and_go_global(): void
@@ -293,44 +300,112 @@ class PublicPagesTest extends TestCase
             ->assertSeeInOrder(['aria-label="Foto sebelumnya"', 'aria-label="Foto berikutnya"', '1 / 3'], false);
     }
 
-    public function test_home_shows_four_products_in_every_row(): void
+    public function test_home_shows_every_umkm_once_in_rows_of_four(): void
     {
-        foreach (range(1, 6) as $i) {
-            $this->umkm(['nama_usaha' => "Brand {$i}", 'skor_total' => 100 - $i]);
-        }
-
-        $html = $this->get('/')->assertOk()->getContent();
-
-        // Tiga baris kategori, masing-masing tepat 4 kartu produk
-        preg_match_all('#<ul class="ib-rail__grid".*?</ul>#s', $html, $grid);
-        $this->assertCount(3, $grid[0]);
-        foreach ($grid[0] as $baris) {
-            $this->assertSame(4, substr_count($baris, 'class="ib-produk"'));
-        }
-    }
-
-    public function test_home_rows_have_random_backup_cards_for_rotation(): void
-    {
-        foreach (range(1, 20) as $i) {
+        foreach (range(1, 10) as $i) {
             $this->umkm(['nama_usaha' => "Brand {$i}"]);
         }
+        $this->umkm(['nama_usaha' => 'Brand Draft', 'status' => 'draft']);
 
-        $html = $this->get('/')->assertOk()->getContent();
+        $html = $this->get('/')->assertOk()->assertDontSee('Brand Draft')->getContent();
 
-        // Setiap baris: 4 kartu tampil + kartu cadangan dalam <template> (gambarnya belum diunduh)
-        preg_match_all('#<template data-rotasi-cadangan>(.*?)</template>#s', $html, $cadangan);
-        $this->assertCount(3, $cadangan[1]);
-        foreach ($cadangan[1] as $isi) {
-            $this->assertSame(12, substr_count($isi, 'class="ib-produk"'));
+        // Semua UMKM aktif dalam baris berisi 4 kartu (baris terakhir sisanya), tanpa kartu cadangan tersembunyi
+        preg_match_all('#<ul class="ib-rail__grid".*?</ul>#s', $html, $grid);
+        $this->assertSame([4, 4, 2], array_map(fn ($b) => substr_count($b, 'class="ib-produk"'), $grid[0]));
+        $this->assertSame(3, substr_count($html, 'data-rotasi-baris'));
+        $this->assertStringNotContainsString('data-rotasi-cadangan', $html);
+        foreach (range(1, 10) as $i) {
+            $this->assertSame(1, substr_count($html, "Brand {$i}</p>"), "Brand {$i} harus tampil tepat sekali");
         }
-        $this->assertSame(3, substr_count($html, 'data-rotasi-jeda '));
 
-        // Pemilihan acak: dari beberapa kunjungan, 4 kartu awal tidak selalu sama
+        // Efek acak: dari beberapa kunjungan, urutan baris pertama tidak selalu sama
         $awal = collect(range(1, 6))->map(function () {
             preg_match('#<ul class="ib-rail__grid".*?</ul>#s', $this->get('/')->getContent(), $m);
             return $m[0];
         });
         $this->assertGreaterThan(1, $awal->unique()->count());
+        $this->assertSame(1, substr_count($html, 'data-rotasi-jeda '));
+    }
+
+    public function test_home_is_paginated_with_consistent_random_order_across_pages(): void
+    {
+        foreach (range(1, 30) as $i) {
+            $this->umkm(['nama_usaha' => "Brand {$i}"]);
+        }
+        $nama = function (string $html) {
+            preg_match_all('#<p class="ib-produk__brand">(.*?)</p>#', $html, $m);
+            return $m[1];
+        };
+
+        // Halaman 1: 24 produk (6 baris × 4) + navigasi halaman yang kembali ke #semua-brand
+        $h1 = $this->get('/')->assertOk()
+            ->assertSee('Menampilkan <strong>1–24</strong>', false)
+            ->assertSee(route('home', ['page' => 2]) . '#semua-brand', false)
+            ->getContent();
+        preg_match_all('#<ul class="ib-rail__grid".*?</ul>#s', $h1, $grid);
+        $this->assertCount(6, $grid[0]);
+
+        // Halaman 2 melanjutkan urutan acak yang sama: sisa 6 produk, tanpa dobel/terlewat
+        $h2 = $this->get('/?page=2')->assertOk()->assertSee('Menampilkan <strong>25–30</strong>', false)->getContent();
+        $this->assertCount(24, $nama($h1));
+        $this->assertCount(6, $nama($h2));
+        $this->assertEqualsCanonicalizing(
+            collect(range(1, 30))->map(fn ($i) => "Brand {$i}")->all(),
+            [...$nama($h1), ...$nama($h2)],
+        );
+
+        // Kembali ke halaman 1 lewat tautan halaman → urutan tetap; buka beranda baru → diacak ulang
+        $this->assertSame($nama($h1), $nama($this->get('/?page=1')->getContent()));
+        $baru = collect(range(1, 5))->map(fn () => implode('|', $nama($this->get('/')->getContent())));
+        $this->assertGreaterThan(1, $baru->push(implode('|', $nama($h1)))->unique()->count());
+
+        // Nomor halaman melebihi batas → halaman terakhir
+        $this->get('/?page=99')->assertRedirect(route('home', ['page' => 2]) . '#semua-brand');
+    }
+
+    public function test_home_summary_row_shows_only_sectors_with_data(): void
+    {
+        $this->umkm();
+        $this->umkm(['nama_usaha' => 'Kopi Sambas', 'kabupaten' => 'Sambas']);
+        $this->umkm(['nama_usaha' => 'Tenun Sambas', 'sektor' => 'kerajinan', 'kabupaten' => 'Sambas']);
+        $this->umkm(['nama_usaha' => 'Ikan Asin', 'sektor' => 'perikanan']);   // digabung ke Pertanian & Agroindustri
+
+        $label = fn (string $l) => '<dt class="ib-stats__label">' . $l . '</dt>';
+
+        // Satu baris: Brand UMKM, sektor yang ada datanya, Kabupaten/Kota — Go Digital/Go Global tidak lagi di ringkasan
+        $res = $this->get('/')->assertOk()->assertSee('ib-stats__grid--baris', false)->assertSee('data-count="5"', false);
+        $res->assertSeeInOrder([
+            $label('Brand UMKM'), '4',
+            $label('Kuliner'), '2',
+            $label('Kerajinan'), '1',
+            $label('Pertanian &amp; Agroindustri'), '1',
+            $label('Kabupaten/Kota'), '2',
+        ], false);
+
+        foreach (['Go Digital', 'Go Global', 'Fesyen', 'Jasa', 'Manufaktur', 'Teknologi Digital', 'Kesehatan &amp; Kecantikan', 'Lainnya'] as $l) {
+            $res->assertDontSee($label($l), false);
+        }
+    }
+
+    public function test_semua_brand_summary_row_matches_home_and_about(): void
+    {
+        $this->umkm();
+        $this->umkm(['nama_usaha' => 'Kopi Sambas', 'kabupaten' => 'Sambas', 'klasifikasi' => 'unggulan']);
+        $this->umkm(['nama_usaha' => 'Tenun Sambas', 'sektor' => 'kerajinan', 'kabupaten' => 'Sambas']);
+
+        $label = fn (string $l) => '<dt class="ib-stats__label">' . $l . '</dt>';
+        $ringkasan = fn (string $html) => \Illuminate\Support\Str::betweenFirst($html, 'aria-label="Ringkasan data"', '</section>');
+
+        $semua = $this->get('/semua-brand')->assertOk()->getContent();
+        $this->assertSame($ringkasan($this->get('/')->getContent()), $ringkasan($semua));               // identik dengan Beranda
+        $this->assertSame($ringkasan($this->get('/tentang-kami')->getContent()), $ringkasan($semua));   // & Tentang Kami
+
+        $this->get('/semua-brand')
+            ->assertSee('ib-stats__grid--baris', false)
+            ->assertSeeInOrder([$label('Brand UMKM'), '3', $label('Kuliner'), '2', $label('Kerajinan'), '1', $label('Kabupaten/Kota'), '2'], false);
+        foreach (['Unggulan', 'Berkembang', 'Go Digital', 'Total UMKM', 'Fesyen', 'Manufaktur'] as $l) {
+            $this->assertStringNotContainsString($label($l), $ringkasan($semua));
+        }
     }
 
     public function test_cached_pages_show_changes_immediately(): void

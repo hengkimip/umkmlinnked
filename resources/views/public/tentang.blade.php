@@ -36,10 +36,10 @@
         'variant' => 'ib-page-hero',
         'badge'   => 'Tentang kami',
         'title'   => 'Menghubungkan UMKM Kalbar dengan peluang',
-        'desc'    => 'UMKMLinked.ID adalah direktori sekaligus dashboard UMKM Kalimantan Barat yang diinisiasi KPw Bank Indonesia Provinsi Kalimantan Barat bersama OPD pembina UMKM.',
+        'desc'    => 'UMKMLinked.ID adalah direktori sekaligus dashboard UMKM Kalimantan Barat yang diinisiasi Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat bersama OPD pembina UMKM.',
     ])
 
-    @include('public.partials.stats', ['stats' => $stats])
+    @include('public.partials.stats', ['stats' => $stats, 'satuBaris' => true])
 
     <div class="ib-wrap ib-about">
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Umkm;
 use App\Support\CacheData;
+use App\Support\RingkasanData;
 use App\Support\FilterUmkm;
 use App\Support\TagUmkm;
 use Illuminate\Http\Request;
@@ -51,29 +52,11 @@ class UmkmController extends Controller
 
         // Daftar filter & statistik sama untuk semua pengunjung → di-cache
         // (dibatalkan otomatis saat data UMKM berubah, lihat CacheData)
-        ['kabupatenList' => $kabupatenList, 'stats' => $stats]
-            = CacheData::ingat('semua-brand:samping', 600, function () {
-                $kosong = Umkm::KABUPATEN_KOSONG;
-                $agg = Umkm::aktif()->toBase()->selectRaw("
-                    count(*) as total,
-                    sum(case when klasifikasi = 'unggulan' then 1 else 0 end) as unggulan,
-                    sum(case when klasifikasi = 'berkembang' then 1 else 0 end) as berkembang,
-                    sum(case when instagram is not null then 1 else 0 end) as digital,
-                    count(distinct case when kabupaten <> ? then kabupaten end) as kabupaten
-                ", [$kosong])->first();
+        $kabupatenList = CacheData::ingat('semua-brand:kabupaten', 600, fn () => Umkm::aktif()->distinct()
+            ->orderBy('kabupaten')->pluck('kabupaten')->filter()->values()->all());
 
-                return [
-                    'kabupatenList' => Umkm::aktif()->distinct()->orderBy('kabupaten')
-                        ->pluck('kabupaten')->filter()->values()->all(),
-                    'stats' => [
-                        ['value' => (int) $agg->total,      'label' => 'Total UMKM', 'highlight' => true],
-                        ['value' => (int) $agg->unggulan,   'label' => 'Unggulan'],
-                        ['value' => (int) $agg->berkembang, 'label' => 'Berkembang'],
-                        ['value' => (int) $agg->digital,    'label' => 'Go Digital'],
-                        ['value' => (int) $agg->kabupaten,  'label' => 'Kabupaten/Kota'],
-                    ],
-                ];
-            });
+        // Ringkasan satu baris sama persis dengan Beranda & Tentang Kami
+        $stats = RingkasanData::publik();
 
         // Kotak centang filter (pilihan & jumlah sama dengan Peta Interaktif)
         $filterTag = TagUmkm::FILTER;

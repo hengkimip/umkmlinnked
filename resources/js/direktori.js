@@ -242,13 +242,15 @@ function initShare() {
 }
 
 /**
- * Beranda: 4 kartu per baris berganti acak dari kartu cadangan (<template>).
+ * Beranda "Semua Brand": seluruh UMKM tampil tepat sekali, 4 kartu per baris sampai ke bawah.
+ * Baris yang terlihat berganti acak dengan bertukar kartu dengan baris lain yang sedang
+ * di luar layar — jadi tidak ada UMKM yang hilang atau tampil dobel.
  * - hanya berjalan saat baris terlihat di layar & tab aktif (hemat CPU/kuota)
  * - berhenti saat kursor/fokus keyboard di baris, atau tombol jeda ditekan (WCAG 2.2.2)
  * - gambar kartu berikutnya dimuat dulu agar pergantian tidak berkedip
  */
 function initRotasiProduk() {
-    const JEDA = 5500; // ms antar-pergantian
+    const JEDA = 5500; // ms antar-pergantian per baris
     const acak = (daftar) => {
         const a = [...daftar];
         for (let i = a.length - 1; i > 0; i--) {
@@ -266,67 +268,85 @@ function initRotasiProduk() {
             img.src = src;
             setTimeout(selesai, 4000);
         });
+    // Tukar posisi dua kartu di DOM (boleh beda baris)
+    const tukar = (a, b) => {
+        const penanda = document.createComment("");
+        a.replaceWith(penanda);
+        b.replaceWith(a);
+        penanda.replaceWith(b);
+    };
 
-    document.querySelectorAll("[data-rotasi]").forEach((grid) => {
-        const rail = grid.closest(".ib-rail");
-        const template = rail?.querySelector("template[data-rotasi-cadangan]");
-        const tombol = rail?.querySelector("[data-rotasi-jeda]");
-        if (!template) return;
+    document.querySelectorAll("[data-rotasi-grup]").forEach((grup) => {
+        const tombol = grup.querySelector("[data-rotasi-jeda]");
+        const baris = [...grup.querySelectorAll("[data-rotasi-baris]")].map((ul) => ({
+            ul,
+            terlihat: false,
+            disentuh: false,
+        }));
+        if (baris.length < 2) return;
 
-        let tampil = [...grid.children];
-        let cadangan = [...template.content.children].map((n) => n.cloneNode(true));
         let dijeda = false;
-        let disentuh = false;
-        let terlihat = false;
-        let sibuk = false;
-        let timer = null;
+        let sibuk = false; // satu pergantian sekaligus agar kartu tidak diperebutkan
 
-        const bolehJalan = () => !dijeda && !disentuh && terlihat && !document.hidden;
+        const bolehJalan = (b) => !dijeda && !b.disentuh && b.terlihat && !document.hidden;
 
-        const ganti = async () => {
-            if (sibuk || !bolehJalan() || !cadangan.length) return;
+        const ganti = async (b) => {
+            if (sibuk || !bolehJalan(b)) return;
+
+            // Sumber kartu: baris lain yang di luar layar; bila semua terlihat, baris lain yang tidak disentuh
+            const lain = baris.filter((x) => x !== b && !x.disentuh);
+            const sumber = lain.some((x) => !x.terlihat) ? lain.filter((x) => !x.terlihat) : lain;
+            const kolam = sumber.flatMap((x) => [...x.ul.children]);
+            if (!kolam.length) return;
+
             sibuk = true;
-            const baru = acak(cadangan).slice(0, Math.min(tampil.length, cadangan.length));
+            const lama = [...b.ul.children];
+            const baru = acak(kolam).slice(0, Math.min(lama.length, kolam.length));
             await Promise.all(baru.map(muatGambar));
 
-            if (bolehJalan()) {
-                const lama = tampil.slice(0, baru.length);
-                baru.forEach((liBaru, i) => {
-                    setTimeout(() => {
-                        lama[i].classList.add("is-keluar");
-                        setTimeout(() => {
-                            liBaru.classList.remove("is-keluar");
-                            liBaru.classList.add("is-masuk");
-                            grid.replaceChild(liBaru, lama[i]);
-                            requestAnimationFrame(() =>
-                                requestAnimationFrame(() => liBaru.classList.remove("is-masuk")),
-                            );
-                        }, 320);
-                    }, i * 110); // bergeser satu per satu, kiri ke kanan
-                });
-                cadangan = cadangan.filter((li) => !baru.includes(li)).concat(lama);
-                tampil = baru.concat(tampil.slice(baru.length));
+            if (bolehJalan(b)) {
+                await Promise.all(
+                    baru.map(
+                        (liBaru, i) =>
+                            new Promise((selesai) =>
+                                setTimeout(() => {
+                                    lama[i].classList.add("is-keluar");
+                                    setTimeout(() => {
+                                        liBaru.classList.add("is-masuk");
+                                        tukar(lama[i], liBaru);
+                                        lama[i].classList.remove("is-keluar");
+                                        requestAnimationFrame(() =>
+                                            requestAnimationFrame(() => liBaru.classList.remove("is-masuk")),
+                                        );
+                                        selesai();
+                                    }, 320);
+                                }, i * 110), // bergeser satu per satu, kiri ke kanan
+                            ),
+                    ),
+                );
             }
             sibuk = false;
         };
 
-        const mulai = () => {
-            clearInterval(timer);
-            timer = setInterval(ganti, JEDA);
-        };
-
         // Hanya berputar saat baris tampil di layar
-        new IntersectionObserver(
-            ([entri]) => {
-                terlihat = entri.isIntersecting;
-            },
+        const pengamat = new IntersectionObserver(
+            (entri) =>
+                entri.forEach((e) => {
+                    const b = baris.find((x) => x.ul === e.target);
+                    if (b) b.terlihat = e.isIntersecting;
+                }),
             { threshold: 0.35 },
-        ).observe(grid);
+        );
 
-        ["mouseenter", "focusin"].forEach((ev) => rail.addEventListener(ev, () => (disentuh = true)));
-        rail.addEventListener("mouseleave", () => (disentuh = false));
-        rail.addEventListener("focusout", (e) => {
-            if (!rail.contains(e.relatedTarget)) disentuh = false;
+        baris.forEach((b) => {
+            pengamat.observe(b.ul);
+            ["mouseenter", "focusin"].forEach((ev) => b.ul.addEventListener(ev, () => (b.disentuh = true)));
+            b.ul.addEventListener("mouseleave", () => (b.disentuh = false));
+            b.ul.addEventListener("focusout", (e) => {
+                if (!b.ul.contains(e.relatedTarget)) b.disentuh = false;
+            });
+            // Baris tidak berganti serentak
+            setTimeout(() => setInterval(() => ganti(b), JEDA), Number(b.ul.dataset.rotasiJedaAwal || 0));
         });
 
         tombol?.addEventListener("click", () => {
@@ -337,9 +357,6 @@ function initRotasiProduk() {
                 (dijeda ? "Lanjutkan" : "Jeda") + tombol.getAttribute("aria-label").replace(/^(Jeda|Lanjutkan)/, ""),
             );
         });
-
-        // Baris tidak berganti serentak
-        setTimeout(mulai, Number(grid.dataset.rotasiJedaAwal || 0));
     });
 }
 

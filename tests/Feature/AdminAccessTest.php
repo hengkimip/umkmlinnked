@@ -110,6 +110,42 @@ class AdminAccessTest extends TestCase
             ->assertSeeInOrder([$peta, 'Peta Interaktif', 'href="' . route('superadmin.dashboard') . '"', 'Dashboard'], false);
     }
 
+    public function test_view_website_links_open_in_same_tab_with_prerender(): void
+    {
+        foreach ([[$this->adminOpd(), '/admin/dashboard'], [$this->superAdmin(), '/superadmin/dashboard']] as [$user, $url]) {
+            $html = $this->actingAs($user)->get($url)->assertOk()
+                ->assertSee('<script type="speculationrules">', false)
+                ->getContent();
+
+            // Sidebar "Lihat Website" & tombol "Lihat Website Publik": tab yang sama, disiapkan di latar
+            preg_match_all('#<a href="' . preg_quote(route('home'), '#') . '"[^>]*>#', $html, $tautan);
+            $this->assertCount(2, $tautan[0], $url);
+            foreach ($tautan[0] as $a) {
+                $this->assertStringContainsString('data-situs-publik', $a);
+                $this->assertStringNotContainsString('target=', $a);
+            }
+        }
+    }
+
+    public function test_public_dashboard_button_goes_to_role_dashboard(): void
+    {
+        $tombol = fn (string $url) => '<a href="' . $url . '" class="ib-nav__cta">Dashboard</a>';
+
+        foreach (['/', '/tentang-kami', '/berita', '/kemitraan', '/semua-brand'] as $halaman) {
+            // Super Admin → /superadmin/dashboard (bukan Peta Interaktif)
+            $this->actingAs($this->superAdmin())->get($halaman)->assertOk()
+                ->assertSee($tombol('/superadmin/dashboard'), false)
+                ->assertDontSee($tombol(route('dashboard')), false);
+
+            // Admin OPD → /admin/dashboard
+            $this->actingAs($this->adminOpd())->get($halaman)->assertOk()
+                ->assertSee($tombol('/admin/dashboard'), false);
+        }
+
+        auth()->logout();
+        $this->get('/')->assertSee('<a href="' . route('login') . '" class="ib-nav__cta">Login Admin</a>', false);
+    }
+
     public function test_dashboard_only_shows_own_opd_for_admin_opd(): void
     {
         $this->umkm($this->opdA);

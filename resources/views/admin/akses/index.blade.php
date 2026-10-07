@@ -69,7 +69,7 @@
                                 <button type="button" @click="ubahNama = !ubahNama" class="ml-1 text-xs font-medium text-navy-700 underline">Ubah nama</button>
                             </p>
                             <p class="text-xs text-slate-500">
-                                {{ $o->kode_opd }} · {{ $kabupaten[$o->kabupaten] ?? $o->kabupaten }} · {{ number_format($o->umkm_count, 0, ',', '.') }} UMKM binaan
+                                {{ $o->kode_opd }} · {{ $o->wilayahLabel() }} · {{ number_format($o->umkm_count, 0, ',', '.') }} UMKM binaan
                             </p>
 
                             {{-- Nama OPD = Instansi admin-nya & label "Binaan …" di UMKM binaannya --}}
@@ -82,11 +82,18 @@
                                            required maxlength="255" class="{{ $input }}">
                                 </div>
                                 <div>
-                                    <label for="kab-{{ $o->id }}" class="mb-1 block text-xs font-medium text-slate-600">Kota/Kabupaten</label>
+                                    <label for="kab-{{ $o->id }}" class="mb-1 block text-xs font-medium text-slate-600">Provinsi/Kota/Kabupaten</label>
                                     <select id="kab-{{ $o->id }}" name="kabupaten" class="{{ $input }}">
-                                        @foreach ($kabupaten as $kode => $nama)
-                                            <option value="{{ $kode }}" @selected($o->kabupaten === $kode)>{{ $nama }}</option>
-                                        @endforeach
+                                        <optgroup label="Tingkat Provinsi">
+                                            @foreach ($wilayahProvinsi as $kode => $nama)
+                                                <option value="{{ $kode }}" @selected($o->kabupaten === $kode)>{{ $nama }}</option>
+                                            @endforeach
+                                        </optgroup>
+                                        <optgroup label="Tingkat Kota/Kabupaten">
+                                            @foreach ($kabupaten as $kode => $nama)
+                                                <option value="{{ $kode }}" @selected($o->kabupaten === $kode)>{{ $nama }}</option>
+                                            @endforeach
+                                        </optgroup>
                                     </select>
                                 </div>
                                 <div class="flex items-end">
@@ -208,6 +215,50 @@
     </section>
 
     <div class="grid gap-6 lg:grid-cols-2">
+        {{-- ==================== TAMBAH OPD ==================== --}}
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6" aria-labelledby="tambah-opd-title">
+            <h2 id="tambah-opd-title" class="mb-4 font-semibold text-slate-900">Beri akses OPD baru</h2>
+            <form method="POST" action="{{ route('superadmin.akses.opd.store') }}" class="space-y-3 text-sm">
+                @csrf
+                <div>
+                    <label for="nama_opd" class="mb-1 block font-medium text-slate-700">Nama OPD</label>
+                    <input id="nama_opd" name="nama_opd" value="{{ old('nama_opd') }}" class="{{ $input }}" required maxlength="255">
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label for="kode_opd" class="mb-1 block font-medium text-slate-700">Kode OPD</label>
+                        <input id="kode_opd" name="kode_opd" value="{{ old('kode_opd') }}" class="{{ $input }}" required maxlength="30" placeholder="mis. DISKOP-PTK">
+                    </div>
+                    <div>
+                        <label for="maks_admin" class="mb-1 block font-medium text-slate-700">Batas admin</label>
+                        <input id="maks_admin" type="number" name="maks_admin" min="1" max="{{ $maksAdminOpd }}" value="{{ old('maks_admin', 1) }}" class="{{ $input }}" required>
+                    </div>
+                </div>
+                <div>
+                    <label for="opd-kabupaten" class="mb-1 block font-medium text-slate-700">Provinsi/Kota/Kabupaten</label>
+                    <select id="opd-kabupaten" name="kabupaten" class="{{ $input }}" required>
+                        <option value="">— Pilih —</option>
+                        <optgroup label="Tingkat Provinsi (OPD provinsi)">
+                            @foreach ($wilayahProvinsi as $kode => $nama)
+                                <option value="{{ $kode }}" @selected(old('kabupaten') === $kode)>{{ $nama }}</option>
+                            @endforeach
+                        </optgroup>
+                        <optgroup label="Tingkat Kota/Kabupaten">
+                            @foreach ($kabupaten as $kode => $nama)
+                                <option value="{{ $kode }}" @selected(old('kabupaten') === $kode)>{{ $nama }}</option>
+                            @endforeach
+                        </optgroup>
+                    </select>
+                </div>
+                @if ($errors->opd->any())
+                    <ul class="list-inside list-disc text-sm text-red-600">
+                        @foreach ($errors->opd->all() as $e) <li>{{ $e }}</li> @endforeach
+                    </ul>
+                @endif
+                <button type="submit" class="rounded-lg bg-green-700 px-4 py-2 font-medium text-white transition hover:bg-green-800">Tambah OPD</button>
+            </form>
+        </section>
+
         {{-- ==================== TAMBAH AKUN ==================== --}}
         <section class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6" aria-labelledby="akun-title"
                  x-data="{ peran: @js(old('peran', User::ROLE_ADMIN_OPD)) }">
@@ -260,43 +311,6 @@
                     </ul>
                 @endif
                 <button type="submit" class="rounded-lg bg-green-700 px-4 py-2 font-medium text-white transition hover:bg-green-800">Buat akun</button>
-            </form>
-        </section>
-
-        {{-- ==================== TAMBAH OPD ==================== --}}
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6" aria-labelledby="tambah-opd-title">
-            <h2 id="tambah-opd-title" class="mb-4 font-semibold text-slate-900">Beri akses OPD baru</h2>
-            <form method="POST" action="{{ route('superadmin.akses.opd.store') }}" class="space-y-3 text-sm">
-                @csrf
-                <div>
-                    <label for="nama_opd" class="mb-1 block font-medium text-slate-700">Nama OPD</label>
-                    <input id="nama_opd" name="nama_opd" value="{{ old('nama_opd') }}" class="{{ $input }}" required maxlength="255">
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <label for="kode_opd" class="mb-1 block font-medium text-slate-700">Kode OPD</label>
-                        <input id="kode_opd" name="kode_opd" value="{{ old('kode_opd') }}" class="{{ $input }}" required maxlength="30" placeholder="mis. DISKOP-PTK">
-                    </div>
-                    <div>
-                        <label for="maks_admin" class="mb-1 block font-medium text-slate-700">Batas admin</label>
-                        <input id="maks_admin" type="number" name="maks_admin" min="1" max="{{ $maksAdminOpd }}" value="{{ old('maks_admin', 1) }}" class="{{ $input }}" required>
-                    </div>
-                </div>
-                <div>
-                    <label for="opd-kabupaten" class="mb-1 block font-medium text-slate-700">Kota/Kabupaten</label>
-                    <select id="opd-kabupaten" name="kabupaten" class="{{ $input }}" required>
-                        <option value="">— Pilih —</option>
-                        @foreach ($kabupaten as $kode => $nama)
-                            <option value="{{ $kode }}" @selected(old('kabupaten') === $kode)>{{ $nama }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @if ($errors->opd->any())
-                    <ul class="list-inside list-disc text-sm text-red-600">
-                        @foreach ($errors->opd->all() as $e) <li>{{ $e }}</li> @endforeach
-                    </ul>
-                @endif
-                <button type="submit" class="rounded-lg bg-green-700 px-4 py-2 font-medium text-white transition hover:bg-green-800">Tambah OPD</button>
             </form>
         </section>
     </div>

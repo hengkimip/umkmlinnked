@@ -9,6 +9,7 @@ export default defineConfig({
                 "resources/css/umkm-card.css",
                 "resources/css/direktori-layout.css",
                 "resources/css/beranda.css",
+                "resources/css/berita.css",
                 "resources/css/bi-map.css",
                 "resources/css/peta-tailwind.css",
                 "resources/css/publik.css",

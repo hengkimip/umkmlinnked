@@ -4,108 +4,86 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Umkm;
 use App\Support\CacheData;
+use App\Support\RingkasanData;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
- * Beranda: etalase produk UMKM dalam tiga baris — Semua Brand, Go Digital, Go Global.
- * Setiap baris menampilkan 4 produk acak dan berganti otomatis dari kartu cadangan.
+ * Beranda: satu kelompok "Semua Brand" — seluruh UMKM aktif, diacak setiap kunjungan,
+ * 4 produk per baris dan dibagi per halaman. Baris yang tampil di layar berganti acak dengan
+ * kartu dari baris lain di halaman yang sama (lihat initRotasiProduk), jadi setiap UMKM tetap tampil tepat sekali.
  */
 class HomeController extends Controller
 {
-    // Empat produk berjejer per baris kategori
+    // Empat produk berjejer per baris
     public const PER_BARIS = 4;
 
-    // Kartu per baris (tampil + cadangan rotasi) dan jumlah kandidat yang diundi
-    private const PER_KOLAM  = 16;
-    private const KANDIDAT   = 60;
+    // 6 baris × 4 produk per halaman
+    public const PER_HALAMAN = 24;
+
     private const CACHE_DETIK = 600;
+    private const KUNCI_ACAK  = 'beranda.acak';
 
-    public function index()
+    public function index(Request $request)
     {
-        $kategori = [
-            ['kunci' => 'semua-brand', 'judul' => 'Semua Brand', 'tema' => 'navy', 'ikon' => 'sparkles',
-             'sub' => 'Produk pilihan dari UMKM binaan KPw Bank Indonesia di 14 kabupaten/kota Kalimantan Barat.',
-             'url' => route('direktori.index'), 'lencana' => 'klasifikasi'],
-            ['kunci' => 'go-digital', 'judul' => 'Go Digital', 'tema' => 'teal', 'ikon' => 'globe',
-             'sub' => 'Sudah hadir di marketplace & media sosial — pesan langsung dari kanal favorit Anda.',
-             'url' => route('godigital.index'), 'lencana' => 'digital'],
-            ['kunci' => 'go-global', 'judul' => 'Go Global', 'tema' => 'gold', 'ikon' => 'shield-check',
-             'sub' => 'Bersertifikat & menjangkau pasar nasional hingga ekspor — siap bersaing lebih luas.',
-             'url' => route('goglobal.index'), 'lencana' => 'global'],
-        ];
+        // ID UMKM (berfoto / tanpa foto) & jumlah kabupaten di-cache; dibatalkan otomatis saat data berubah
+        $data = CacheData::ingat('beranda:urutan', self::CACHE_DETIK, fn () => $this->dataBeranda());
 
-        // Kandidat (ID) & total per kategori di-cache; dibatalkan otomatis saat data berubah
-        $data = CacheData::ingat('beranda', self::CACHE_DETIK, fn () => $this->dataKategori());
+        // Urutan acak baru setiap beranda dibuka tanpa nomor halaman; kunci acak disimpan di sesi
+        // agar halaman 2, 3, … melanjutkan urutan yang sama (tidak ada UMKM dobel/terlewat antarhalaman)
+        $kunci = $request->session()->get(self::KUNCI_ACAK);
+        if (! $request->has('page') || ! is_string($kunci)) {
+            $kunci = bin2hex(random_bytes(8));
+            $request->session()->put(self::KUNCI_ACAK, $kunci);
+        }
+        $acak = fn (array $id) => collect($id)->sortBy(fn ($i) => hash('xxh3', "{$kunci}:{$i}"))->values();
 
-        // Undi kolam acak per baris; 4 kartu awal tiap baris tidak sama dengan baris lain
-        $sudahTampil = [];
-        $kolam = [];
-        foreach ($kategori as $k) {
-            $kandidat = collect($data[$k['kunci']]['kandidat'])->shuffle();
-            $awal     = $kandidat->diff($sudahTampil)->take(self::PER_BARIS);
-            $awal     = $awal->concat($kandidat->diff($awal)->take(self::PER_BARIS - $awal->count()));
-            array_push($sudahTampil, ...$awal);
+        // UMKM berfoto didahulukan agar etalase atas tetap menarik
+        $urutan = $acak($data['berfoto'])->concat($acak($data['tanpaFoto']));
 
-            $kolam[$k['kunci']] = [
-                'awal'     => $awal->values()->all(),
-                'cadangan' => $kandidat->diff($awal)->take(self::PER_KOLAM - $awal->count())->values()->all(),
-            ];
+        $halaman   = LengthAwarePaginator::resolveCurrentPage();
+        $paginator = new LengthAwarePaginator(
+            $urutan->forPage($halaman, self::PER_HALAMAN)->values(),
+            $urutan->count(),
+            self::PER_HALAMAN,
+            $halaman,
+            ['path' => route('home'), 'pageName' => 'page'],
+        );
+        $paginator->fragment('semua-brand');
+
+        // Nomor halaman melebihi jumlah halaman → kembali ke halaman terakhir
+        if ($halaman > 1 && $paginator->isEmpty() && $urutan->isNotEmpty()) {
+            return redirect($paginator->url($paginator->lastPage()));
         }
 
-        // Satu query untuk semua UMKM yang dipakai di ketiga baris
         $model = Umkm::with([
                 'produk' => fn ($q) => $q->where('is_active', true)->orderByDesc('is_unggulan')->orderBy('urutan'),
                 'legalitas', 'pemasaran',
             ])
-            ->findMany(collect($kolam)->flatMap(fn ($k) => [...$k['awal'], ...$k['cadangan']])->unique()->all())
+            ->findMany($paginator->all())
             ->keyBy('id');
 
-        $ambil = fn (array $id) => collect($id)->map(fn ($i) => $model->get($i))->filter()->values();
-
-        $baris = array_map(fn ($k) => $k + [
-            'total'    => $data[$k['kunci']]['total'],
-            'umkm'     => $ambil($kolam[$k['kunci']]['awal']),
-            'cadangan' => $ambil($kolam[$k['kunci']]['cadangan']),
-        ], $kategori);
-
-        $stats = [
-            ['value' => $baris[0]['total'], 'label' => 'Brand UMKM', 'highlight' => true],
-            ['value' => $baris[1]['total'], 'label' => 'Go Digital'],
-            ['value' => $baris[2]['total'], 'label' => 'Go Global'],
-            ['value' => $data['kabupaten'],  'label' => 'Kabupaten/Kota'],
+        $semuaBrand = [
+            'judul' => 'Semua Brand',
+            'sub'   => 'Produk pilihan dari UMKM Binaan Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat di 14 kabupaten/kota.',
+            'url'   => route('direktori.index'),
+            'total' => $urutan->count(),
+            'baris' => collect($paginator->items())->map(fn ($id) => $model->get($id))->filter()->chunk(self::PER_BARIS)->values(),
         ];
 
-        return view('public.home', compact('baris', 'stats'));
+        $stats = RingkasanData::publik();
+
+        return view('public.home', compact('semuaBrand', 'stats', 'paginator'));
     }
 
-    /**
-     * Kandidat per kategori: UMKM berfoto dan berskor tertinggi didahulukan,
-     * Go Digital mendahulukan yang hadir di lebih banyak kanal marketplace/media sosial.
-     */
-    private function dataKategori(): array
+    private function dataBeranda(): array
     {
-        $kanalDigital = '(tokopedia is not null) + (shopee is not null) + (instagram is not null) + (facebook is not null)';
-
-        // get() (bukan pluck) agar kolom urutan "punya_foto" dari fotoDulu() tetap ada di SELECT
-        $kandidat = fn ($query) => $query->fotoDulu()->orderByDesc('skor_total')
-            ->limit(self::KANDIDAT)->get()->modelKeys();
+        $umkm = Umkm::aktif()->select('umkm.id')->fotoDulu()->toBase()->get()
+            ->groupBy(fn ($u) => $u->punya_foto ? 'berfoto' : 'tanpaFoto');
 
         return [
-            'semua-brand' => [
-                'total'    => Umkm::aktif()->count(),
-                'kandidat' => $kandidat(Umkm::aktif()),
-            ],
-            'go-digital' => [
-                'total'    => Umkm::aktif()->goDigital()->count(),
-                'kandidat' => $kandidat(Umkm::aktif()->goDigital()->orderByRaw("{$kanalDigital} desc")),
-            ],
-            'go-global' => [
-                'total'    => Umkm::aktif()->goGlobal()->count(),
-                'kandidat' => $kandidat(Umkm::aktif()->goGlobal()),
-            ],
-            'kabupaten' => Umkm::aktif()
-                ->where('kabupaten', '!=', Umkm::KABUPATEN_KOSONG)
-                ->distinct()
-                ->count('kabupaten'),
+            'berfoto'   => $umkm->get('berfoto', collect())->pluck('id')->all(),
+            'tanpaFoto' => $umkm->get('tanpaFoto', collect())->pluck('id')->all(),
         ];
     }
 }

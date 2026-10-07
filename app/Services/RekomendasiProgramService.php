@@ -4,7 +4,7 @@ namespace App\Services;
 use App\Models\Umkm;
 
 /**
- * Rekomendasi program pengembangan UMKM dari KPw Bank Indonesia Kalimantan Barat,
+ * Rekomendasi program pengembangan UMKM dari Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat,
  * diturunkan otomatis dari data profil (aturan sederhana & dapat ditelusuri).
  * Keputusan akhir tetap pada tim KPw BI.
  */

@@ -64,7 +64,7 @@
 
             <div class="ib-info-banner" role="status" style="margin-bottom:24px">
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.01v.01H12v-.01Z"/></svg>
-                <span>Formulir daring segera aktif. Sementara ini, silakan hubungi KPw Bank Indonesia Provinsi Kalimantan Barat.</span>
+                <span>Formulir daring segera aktif. Sementara ini, silakan hubungi Kantor Perwakilan Bank Indonesia Provinsi Kalimantan Barat.</span>
             </div>
 
             <form class="ib-form-grid" aria-describedby="form-status">
