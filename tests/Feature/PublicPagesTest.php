@@ -382,7 +382,7 @@ class PublicPagesTest extends TestCase
             $label('Kabupaten/Kota'), '2',
         ], false);
 
-        foreach (['Go Digital', 'Go Global', 'Fesyen', 'Jasa', 'Manufaktur', 'Teknologi Digital', 'Kesehatan &amp; Kecantikan', 'Lainnya'] as $l) {
+        foreach (['Go Digital', 'Go Global', 'Fesyen/Wastra', 'Jasa', 'Lainnya'] as $l) {
             $res->assertDontSee($label($l), false);
         }
     }
@@ -403,7 +403,7 @@ class PublicPagesTest extends TestCase
         $this->get('/semua-brand')
             ->assertSee('ib-stats__grid--baris', false)
             ->assertSeeInOrder([$label('Brand UMKM'), '3', $label('Kuliner'), '2', $label('Kerajinan'), '1', $label('Kabupaten/Kota'), '2'], false);
-        foreach (['Unggulan', 'Berkembang', 'Go Digital', 'Total UMKM', 'Fesyen', 'Manufaktur'] as $l) {
+        foreach (['Unggulan', 'Berkembang', 'Go Digital', 'Total UMKM', 'Fesyen/Wastra', 'Jasa'] as $l) {
             $this->assertStringNotContainsString($label($l), $ringkasan($semua));
         }
     }

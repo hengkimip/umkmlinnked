@@ -110,7 +110,7 @@
                     @forelse ($terbaru as $umkm)
                         <tr class="hover:bg-slate-50">
                             <td class="px-5 py-3 font-medium text-slate-900 sm:px-6">{{ $umkm->nama_usaha }}</td>
-                            <td class="px-3 py-3 text-slate-600">{{ ucfirst($umkm->sektor) }}</td>
+                            <td class="px-3 py-3 text-slate-600">{{ $umkm->sektor_label }}</td>
                             <td class="px-3 py-3 text-slate-600">
                                 @if ($umkm->kabupaten === 'Tidak Diketahui')
                                     <span class="text-amber-700" title="Perlu koreksi manual">{{ $umkm->kabupaten }}</span>

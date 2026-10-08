@@ -245,17 +245,19 @@ class UmkmImportSeeder extends Seeder
                 || str_contains($sektor, 'makanan')
                 || str_contains($sektor, 'minuman')    => 'kuliner',
             str_contains($sektor, 'fashion')
+                || str_contains($sektor, 'fesyen')
+                || str_contains($sektor, 'wastra')
                 || str_contains($sektor, 'pakaian')
                 || str_contains($sektor, 'tekstil')    => 'fashion',
             str_contains($sektor, 'kerajinan')
                 || str_contains($sektor, 'handicraft') => 'kerajinan',
             str_contains($sektor, 'pertanian')
-                || str_contains($sektor, 'agro')       => 'pertanian',
-            str_contains($sektor, 'perikanan')
-                || str_contains($sektor, 'ikan')       => 'perikanan',
-            str_contains($sektor, 'jasa')              => 'jasa',
-            str_contains($sektor, 'teknologi')
-                || str_contains($sektor, 'digital')    => 'teknologi',
+                || str_contains($sektor, 'agro')
+                || str_contains($sektor, 'perikanan')
+                || str_contains($sektor, 'ikan')       => 'pertanian',
+            str_contains($sektor, 'jasa')
+                || str_contains($sektor, 'teknologi')
+                || str_contains($sektor, 'digital')    => 'jasa',
             default                                     => 'lainnya',
         };
     }

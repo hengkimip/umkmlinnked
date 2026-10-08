@@ -48,7 +48,7 @@ class BiMapController extends Controller
             return [
                 'id'       => $u->id,
                 'nama'     => $u->nama_usaha,
-                'sektor'   => ucfirst($u->sektor),
+                'sektor'   => $u->sektor_label,
                 'kab'      => $kabLengkap,
                 'alamat'   => $u->alamat_usaha ?: '-', // ← BARU
                 'skor'     => $u->skor_total,

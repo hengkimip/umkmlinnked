@@ -11,19 +11,24 @@ class Umkm extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
-    // Label tampilan untuk nilai kolom `sektor` (hasil UmkmImport::mapSektor)
+    // 6 sektor usaha resmi: kode kolom `sektor` => label tampilan (hasil UmkmImport::mapSektor)
     public const SEKTOR_LABEL = [
-        'kuliner'     => 'Kuliner',
-        'fashion'     => 'Fesyen',
-        'kerajinan'   => 'Kerajinan',
-        'pertanian'   => 'Pertanian & Agro',
-        'perikanan'   => 'Perikanan',
-        'jasa'        => 'Jasa',
-        'teknologi'   => 'Teknologi',
-        'perdagangan' => 'Perdagangan',
-        'manufaktur'  => 'Manufaktur',
-        'kesehatan'   => 'Kesehatan & Kecantikan',
-        'lainnya'     => 'Lainnya',
+        'kuliner'   => 'Kuliner',
+        'fashion'   => 'Fesyen/Wastra',
+        'kerajinan' => 'Kerajinan',
+        'pertanian' => 'Pertanian & Agroindustri',
+        'jasa'      => 'Jasa',
+        'lainnya'   => 'Lainnya',
+    ];
+
+    // Kode sektor lama (sebelum diringkas jadi 6) => sektor penggantinya
+    public const SEKTOR_LAMA = [
+        'perikanan'   => 'pertanian',
+        'perkebunan'  => 'pertanian',
+        'teknologi'   => 'jasa',
+        'perdagangan' => 'lainnya',
+        'manufaktur'  => 'lainnya',
+        'kesehatan'   => 'lainnya',
     ];
 
     public const KABUPATEN_KOSONG = 'Tidak Diketahui';
@@ -306,7 +311,15 @@ class Umkm extends Model
 
     public function getSektorLabelAttribute(): string
     {
-        return self::SEKTOR_LABEL[$this->sektor] ?? ucfirst((string) $this->sektor);
+        return self::SEKTOR_LABEL[self::kodeSektor($this->sektor)];
+    }
+
+    /** Kode sektor apa pun (termasuk kode lama/tak dikenal) => salah satu dari 6 sektor resmi. */
+    public static function kodeSektor(?string $sektor): string
+    {
+        $sektor = self::SEKTOR_LAMA[$sektor] ?? $sektor;
+
+        return isset(self::SEKTOR_LABEL[$sektor]) ? $sektor : 'lainnya';
     }
 
     /**
@@ -323,12 +336,14 @@ class Umkm extends Model
             ->select('sektor', \Illuminate\Support\Facades\DB::raw('count(*) as jumlah'))
             ->whereNotNull('sektor')
             ->groupBy('sektor')
-            ->orderByDesc('jumlah')
             ->get()
-            ->mapWithKeys(fn ($r) => [$r->sektor => [
-                'label' => self::SEKTOR_LABEL[$r->sektor] ?? ucfirst($r->sektor),
-                'count' => (int) $r->jumlah,
-            ]])
+            // Kode lama/tak dikenal digabung ke salah satu dari 6 sektor resmi
+            ->groupBy(fn ($r) => self::kodeSektor($r->sektor))
+            ->map(fn ($baris, $kode) => [
+                'label' => self::SEKTOR_LABEL[$kode],
+                'count' => (int) $baris->sum('jumlah'),
+            ])
+            ->sortByDesc('count')
             ->all();
     }
 
@@ -477,7 +492,7 @@ class Umkm extends Model
             'kab'           => $this->kabupaten_lengkap,
             'kecamatan'     => $this->kecamatan,
             'kelurahan'     => $this->kelurahan,
-            'sektor'        => ucfirst($this->sektor),
+            'sektor'        => $this->sektor_label,
             'sub_sektor'    => $this->sub_sektor,
             'alamat'        => $this->alamat_usaha,
             'telepon'       => $this->telepon,

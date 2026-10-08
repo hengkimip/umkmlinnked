@@ -23,7 +23,7 @@ class RekomendasiProgramService
         $pemasaran = $umkm->pemasaran;
         $keuangan  = $umkm->keuanganTerakhir;
         $profil    = $umkm->profil;
-        $pangan    = in_array($umkm->sektor, ['kuliner', 'pertanian', 'perikanan'], true);
+        $pangan    = in_array($umkm->sektor, ['kuliner', 'pertanian'], true);
         $platform  = count($pemasaran?->platform_online ?? []);
         $jangkauan = $pemasaran?->jangkauan_pasar;
 
@@ -90,7 +90,7 @@ class RekomendasiProgramService
                 'Produk ' . mb_strtolower($umkm->sektor_label) . ' berpotensi dikurasi untuk etalase nasional.');
         }
 
-        if (in_array($umkm->sektor, ['pertanian', 'perikanan'], true)) {
+        if ($umkm->sektor === 'pertanian') {
             $tambah('Program Klaster Ketahanan Pangan', 'Klaster', 'sedang',
                 'Sektor ' . mb_strtolower($umkm->sektor_label) . ' sejalan dengan program pengendalian inflasi pangan.');
         }

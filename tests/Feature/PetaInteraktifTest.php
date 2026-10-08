@@ -227,7 +227,9 @@ class PetaInteraktifTest extends TestCase
             ->assertOk()
             ->assertSee('geo/kalbar.geojson')
             ->assertSeeInOrder(['Wilayah', 'Sektor Usaha', 'Platform Digital', 'Jangkauan Pasar', 'Sertifikasi Produk', 'Reset', 'Beranda'])
-            ->assertSee(['Kesehatan &amp; Kecantikan', 'TikTok Shop', 'Ekspor (Internasional)', 'HKI/Merek Terdaftar'], false)
+            ->assertSee(['Fesyen/Wastra', 'Pertanian &amp; Agroindustri', 'TikTok Shop', 'Ekspor (Internasional)', 'HKI/Merek Terdaftar'], false)
+            // Sektor usaha hanya 6: Kuliner, Fesyen/Wastra, Kerajinan, Pertanian & Agroindustri, Jasa, Lainnya
+            ->assertDontSee(['Manufaktur', 'Teknologi Digital', 'Kesehatan &amp; Kecantikan', 'Perikanan', 'Perdagangan'], false)
             // Tombol "Beranda" (dulu "Semua Brand") kembali ke halaman depan
             ->assertSee('href="' . route('home') . '"', false)
             ->assertDontSee('Semua Brand')

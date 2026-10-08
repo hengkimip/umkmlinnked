@@ -102,8 +102,8 @@ final class FilterUmkm
             }
             $izin = TagUmkm::kode($grup);
             if ($grup === 'sektor') {
-                // Kode sektor database (mis. "perikanan" dari Go Digital/Go Global) tetap diterima
-                $izin = array_values(array_unique([...$izin, ...array_keys(Umkm::SEKTOR_LABEL)]));
+                // Kode sektor lama (mis. "perikanan" dari tautan lama) tetap diterima
+                $izin = array_values(array_unique([...$izin, ...array_keys(Umkm::SEKTOR_LAMA)]));
             }
             $dipilih = array_map(fn ($v) => strtolower(trim($v)), explode(',', $mentah));
             $daftar  = array_values(array_intersect($izin, $dipilih));

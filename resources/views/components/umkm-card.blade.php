@@ -34,6 +34,6 @@
 
     <div class="umkm-card__info umkm-card__info--{{ $theme }}">
         <p class="umkm-card__nama">{{ $item->nama_usaha }}</p>
-        <p class="umkm-card__sektor">{{ ucfirst($item->sektor) }}</p>
+        <p class="umkm-card__sektor">{{ $item->sektor_label }}</p>
     </div>
 </a>

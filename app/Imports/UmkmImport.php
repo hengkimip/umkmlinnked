@@ -366,17 +366,13 @@ private function konversiUrlDownload(string $url): string
     private function mapSektor(string $sektor): string
     {
         $sektor = strtolower($sektor);
+        // Hasilnya selalu salah satu dari 6 sektor Umkm::SEKTOR_LABEL
         $map = [
-            'kuliner'     => ['makanan','minuman','kuliner','pangan','kue','bumbu','madu'],
-            'fashion'     => ['fashion','pakaian','baju','busana','tekstil'],
-            'kerajinan'   => ['kerajinan','craft','anyaman','tenun'],
-            'pertanian'   => ['pertanian','perkebunan','tani','kebun'],
-            'perikanan'   => ['perikanan','ikan','nelayan','kelautan'],
-            'kesehatan'   => ['kesehatan','kecantikan','kosmetik','skincare','herbal','jamu'],
-            'manufaktur'  => ['manufaktur','industri','pabrik'],
-            'jasa'      => ['jasa','layanan','service'],
-            'teknologi'   => ['teknologi','digital','it','aplikasi'],
-            'perdagangan' => ['dagang','toko','retail','distributor'],
+            'kuliner'   => ['makanan','minuman','kuliner','pangan','kue','bumbu','madu'],
+            'fashion'   => ['fashion','fesyen','wastra','pakaian','baju','busana','tekstil','tenun','batik','songket'],
+            'kerajinan' => ['kerajinan','craft','anyaman','souvenir','cendera'],
+            'pertanian' => ['pertanian','agro','perkebunan','tani','kebun','perikanan','ikan','nelayan','kelautan','ternak'],
+            'jasa'      => ['jasa','layanan','service','teknologi','digital','aplikasi'],
         ];
         foreach ($map as $key => $keywords) {
             foreach ($keywords as $kw) {

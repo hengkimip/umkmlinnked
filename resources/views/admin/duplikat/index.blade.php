@@ -9,7 +9,7 @@
 
 @php
     $kab   = fn (?string $k) => $k ? (Umkm::KABUPATEN_LENGKAP[$k] ?? $k) : null;
-    $sektor = fn (?string $s) => $s ? (Umkm::SEKTOR_LABEL[$s] ?? ucfirst($s)) : null;
+    $sektor = fn (?string $s) => $s ? Umkm::SEKTOR_LABEL[Umkm::kodeSektor($s)] : null;
     $user  = auth()->user();
 @endphp
 

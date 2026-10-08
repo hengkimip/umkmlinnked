@@ -13,17 +13,7 @@ use App\Models\Umkm;
 final class TagUmkm
 {
     public const FILTER = [
-        'sektor' => ['judul' => 'Sektor Usaha', 'opsi' => [
-            'kuliner'    => 'Kuliner',
-            'fashion'    => 'Fesyen',
-            'kerajinan'  => 'Kerajinan',
-            'pertanian'  => 'Pertanian & Agroindustri',
-            'jasa'       => 'Jasa',
-            'manufaktur' => 'Manufaktur',
-            'teknologi'  => 'Teknologi Digital',
-            'kesehatan'  => 'Kesehatan & Kecantikan',
-            'lainnya'    => 'Lainnya',
-        ]],
+        'sektor' => ['judul' => 'Sektor Usaha', 'opsi' => Umkm::SEKTOR_LABEL],
         'platform' => ['judul' => 'Platform Digital', 'opsi' => [
             'tokopedia'   => 'Tokopedia',
             'shopee'      => 'Shopee',
@@ -60,9 +50,6 @@ final class TagUmkm
         'profil:id,umkm_id,program_bi,saluran_pemasaran,marketplace,bentuk_legalitas,sertifikasi_produk',
     ];
 
-    // Sektor database yang digabung ke tombol lain (sektor tak dikenal → "Lainnya")
-    private const SEKTOR_GABUNG = ['perikanan' => 'pertanian'];
-
     private const MARKETPLACE_LAIN = '/lazada|bukalapak|blibli|jd\.id|zalora|gofood|grabfood|shopeefood|amazon|alibaba|etsy/';
 
     // Host yang bukan "website mandiri" (media sosial, marketplace, tautan bio)
@@ -90,12 +77,10 @@ final class TagUmkm
         return array_keys(self::FILTER[$grup]['opsi'] ?? []);
     }
 
-    /** Kode sektor database → kode tombol Sektor Usaha (mis. perikanan → pertanian). */
+    /** Kode sektor database → kode tombol Sektor Usaha (kode lama mis. perikanan → pertanian). */
     public static function kodeSektor(?string $sektor): string
     {
-        $sektor = self::SEKTOR_GABUNG[$sektor] ?? $sektor;
-
-        return isset(self::FILTER['sektor']['opsi'][$sektor]) ? $sektor : 'lainnya';
+        return Umkm::kodeSektor($sektor);
     }
 
     /**

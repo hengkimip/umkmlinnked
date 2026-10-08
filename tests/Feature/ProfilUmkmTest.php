@@ -408,6 +408,31 @@ class ProfilUmkmTest extends TestCase
         $this->assertSame('Singkawang', Umkm::firstWhere('nama_usaha', 'Kopi Budi')->kabupaten);
     }
 
+    public function test_sektor_usaha_only_has_six_options_in_import_and_profile(): void
+    {
+        $csv = UploadedFile::fake()->createWithContent('data.csv', implode("\n", [
+            'nama_pemilik_usaha,no_whatsapp,nama_umkmusaha,alamat_usaha,sektor_usaha',
+            'A,081211110001,Usaha Satu,"Jl. A, Pontianak",Tenun / Wastra',
+            'B,081211110002,Usaha Dua,"Jl. B, Pontianak",Perikanan',
+            'C,081211110003,Usaha Tiga,"Jl. C, Pontianak",Teknologi Digital',
+            'D,081211110004,Usaha Empat,"Jl. D, Pontianak",Manufaktur',
+        ]));
+        $this->actingAs($this->adminOpd())->post('/admin/import', ['file' => $csv])->assertSessionHas('success');
+
+        $this->assertSame(
+            ['Usaha Satu' => 'fashion', 'Usaha Dua' => 'pertanian', 'Usaha Tiga' => 'jasa', 'Usaha Empat' => 'lainnya'],
+            Umkm::whereLike('nama_usaha', 'Usaha %')->pluck('sektor', 'nama_usaha')->all(),
+        );
+
+        $umkm  = $this->umkm($this->opdA);
+        $admin = $this->adminOpd();
+        $this->actingAs($admin)->get("/admin/profil-umkm?umkm={$umkm->id}")->assertOk()
+            ->assertSeeInOrder(['Kuliner', 'Fesyen/Wastra', 'Kerajinan', 'Pertanian &amp; Agroindustri', 'Jasa', 'Lainnya'], false)
+            ->assertDontSee('Manufaktur');
+        $this->ubah($admin, $umkm, 'sektor', 'manufaktur')->assertUnprocessable();
+        $this->ubah($admin, $umkm, 'sektor', 'fashion')->assertOk();
+    }
+
     public function test_import_keeps_questionnaire_answers(): void
     {
         $header = [

@@ -1,7 +1,9 @@
 <?php
 namespace App\Http\Requests;
 
+use App\Models\Umkm;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateUmkmRequest extends FormRequest  // ← nama class harus sama dengan nama file
 {
@@ -16,9 +18,7 @@ class UpdateUmkmRequest extends FormRequest  // ← nama class harus sama dengan
             'nama_usaha'          => ['sometimes', 'required', 'string', 'max:255'],
             'pemilik_usaha_id'    => ['sometimes', 'required', 'exists:pemilik_usaha,id'],
             'deskripsi'           => ['nullable', 'string', 'max:5000'],
-            'sektor'              => ['sometimes', 'required', 'string',
-                                      'in:pertanian,perkebunan,perikanan,kuliner,fashion,
-                                          kerajinan,jasa,teknologi,perdagangan,lainnya'],
+            'sektor'              => ['sometimes', 'required', 'string', Rule::in(array_keys(Umkm::SEKTOR_LABEL))],
             'sub_sektor'          => ['nullable', 'string', 'max:100'],
             'kabupaten'           => ['sometimes', 'required', 'string', 'max:100'],
             'kecamatan'           => ['sometimes', 'required', 'string', 'max:100'],
